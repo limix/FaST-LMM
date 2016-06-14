@@ -161,7 +161,7 @@ def single_snp_select(test_snps, pheno, G=None, covar=None,
             sid_idx_in_fold = G_in.sid_to_index(top_snps_in_fold)
             G_train = G_in[train_idx,sid_idx_in_fold] if k > 0 else None
             fastlmm = FastLMM(force_full_rank=force_full_rank, force_low_rank=force_low_rank,GB_goal=GB_goal)
-            fastlmm.fit(K0_train=G_train, X=covar_in[train_idx,:], y=pheno_in[train_idx,:], h2=h2) #iid intersection means when can give the whole covariate and pheno
+            fastlmm.fit(K0_train=G_train, X=covar_in[train_idx,:], y=pheno_in[train_idx,:], h2raw=h2) #iid intersection means when can give the whole covariate and pheno
             G_test = G_in[test_idx,sid_idx_in_fold] if k > 0 else KernelIdentity(G_in.iid,G_in.iid[test_idx]) #!!! instead of this, which blows up when # of iids is large, should switch to linear regression model with k is 0
             nll,mse = fastlmm.score(K0_whole_test=G_test,X=covar_in[test_idx,:],y=pheno_in[test_idx,:],return_mse_too=True) #iid intersection means when can give the whole covariate and pheno
             nll_sum += nll

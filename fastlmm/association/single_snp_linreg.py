@@ -90,16 +90,28 @@ def single_snp_linreg(test_snps, pheno, covar=None, max_output_len=None, output_
     test_snps, pheno, covar  = pstutil.intersect_apply([test_snps, pheno, covar])
     logging.debug("# of iids now {0}".format(test_snps.iid_count))
 
-    _, _, block_size = _set_block_size(test_snps, None, 0, GB_goal, force_full_rank=False, force_low_rank=False)
+    if GB_goal is not None:
+        bytes_per_sid = test_snps.iid_count * 8 
+        sid_per_GB_goal = 1024.0**3*GB_goal/bytes_per_sid
+        block_size = max(1,int(sid_per_GB_goal+.5))
+        block_count = test_snps.sid_count / block_size
+    else:
+        block_count = 1
+        block_size = test_snps.sid_count
+    logging.debug("block_count={0}, block_size={1}".format(block_count,block_size))
+
 
     #!!!what about missing data in covar, in test_snps, in y
     covar = np.c_[covar.read(view_ok=True,order='A').val,np.ones((test_snps.iid_count, 1))]  #view_ok because np.c_ will allocation new memory
     y =  pheno.read(view_ok=True,order='A').val #view_ok because this code already did a fresh read to look for any missing values
 
     def mapper(start):
+        logging.info("single_snp_linereg reading start={0},block_size={1}".format(start,block_size))
         snp_index = np.arange(start,min(start+block_size,test_snps.sid_count))
         x = test_snps[:,start:start+block_size].read().standardize().val
+        logging.info("single_snp_linereg linreg")
         _,pval_in = lin_reg.f_regression_cov_alt(x,y,covar)
+        logging.info("single_snp_linereg done")
         pval_in = pval_in.reshape(-1)
 
         if max_output_len is None:

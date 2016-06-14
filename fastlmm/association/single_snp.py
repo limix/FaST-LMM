@@ -160,14 +160,15 @@ def single_snp(test_snps, pheno, K0=None,
                                     runner=runner)
         sid_index_range = IntRangeSet(frame['sid_index'])
         assert sid_index_range == (0,test_snps.sid_count), "Some SNP rows are missing from the output"
-    else:
+    else: 
         chrom_list = list(set(test_snps.pos[:,0])) # find the set of all chroms mentioned in test_snps, the main testing data
-
+        #!!!cmk add error message of chrom_list is just NaN's
         input_files = [test_snps, pheno, K0, G0, K1, G1, covar] + ([] if covar_by_chrom is None else covar_by_chrom.values())
 
         def nested_closure(chrom):
             test_snps_chrom = test_snps[:,test_snps.pos[:,0]==chrom]
             covar_chrom = _create_covar_chrom(covar, covar_by_chrom, chrom)
+            cache_file_chrom = None if cache_file is None else cache_file + ".{0}".format(chrom)
 
             K0_chrom = _K_per_chrom(K0 or G0 or test_snps, chrom, test_snps.iid)
             K1_chrom = _K_per_chrom(K1 or G1, chrom, test_snps.iid)
@@ -178,7 +179,7 @@ def single_snp(test_snps, pheno, K0=None,
 
             distributable = _internal_single(K0=K0_chrom, test_snps=test_snps_chrom, pheno=pheno_chrom,
                                         covar=covar_chrom, K1=K1_chrom,
-                                        mixing=mixing, h2=h2, log_delta=log_delta, cache_file=None,
+                                        mixing=mixing, h2=h2, log_delta=log_delta, cache_file=cache_file_chrom,
                                         force_full_rank=force_full_rank,force_low_rank=force_low_rank,
                                         output_file_name=None, block_size=block_size, interact_with_snp=interact_with_snp,
                                         runner=Local())
@@ -594,6 +595,7 @@ def _internal_single(K0, test_snps, pheno, covar, K1,
         chi2stats = beta*beta/res['variance_beta']
         #p_values = stats.chi2.sf(chi2stats,1)[:,0]
         assert test_snps.iid_count == lmm.U.shape[0]
+        #!!!cmk should 3 really be hardcoded here?
         p_values = stats.f.sf(chi2stats,1,lmm.U.shape[0]-3)[:,0]#note that G.shape is the number of individuals and 3 is the number of fixed effects (covariates+SNP)
 
         dataframe = _create_dataframe(snps_read.sid_count)
@@ -694,7 +696,7 @@ def _find_mixing_from_Ks(K, covar, K0_val, K1_val, h2, y):
         result = lmm.findH2()
         if (resmin[0] is None) or (result['nLL']<resmin[0]['nLL']):
             resmin[0]=result
-        logging.debug("mixing_from_Ks\t{0}\th2\t{1}\tnLL\t{2}".format(mixing,result['h2'],result['nLL']))
+        logging.info("mixing_from_Ks\t{0}\th2\t{1}\tnLL\t{2}".format(mixing,result['h2'],result['nLL'])) #!!!cmk change back to debug
         #logging.info("reporter:counter:single_snp,find_mixing_from_Ks_count,1")
         assert not np.isnan(result['nLL']), "nLL should be a number (not a NaN)"
         return result['nLL']
@@ -703,7 +705,6 @@ def _find_mixing_from_Ks(K, covar, K0_val, K1_val, h2, y):
     if not isinstance(mixing, (int, long, float, complex)):
         assert mixing.ndim == 1 and mixing.shape[0] == 1
         mixing = mixing[0]
-
     h2 = resmin[0]['h2']
     return mixing, h2
 

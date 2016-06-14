@@ -14,22 +14,22 @@ from fastlmm.feature_selection.test import TestFeatureSelection
 
 from fastlmm.util.runner import Local, Hadoop2, HPC, LocalMultiProc, LocalInParts
 def mf_to_runner_function(mf):
-    excluded_nodes=['gcrcn0231']#"MSR-HDP-DN0316","MSR-HDP-DN0321","MSR-HDP-DN0336","MSR-HDP-DN0377","MSR-HDP-DN0378","MSR-HDP-DN0314","MSR-HDP-DN0335","MSRQC073","MSRQC002","MSRQC015"]
-    remote_python_parent=r"\\GCR\Scratch\RR1\escience\carlk\data\carlk\pythonpath11242014"
+    excluded_nodes=['GCRCM07B20','GCRCM11B05','GCRCM10B06','GCRCM02B07']#'GCRCM02B11','GCRCM03B07'] #'GCRCM22B06','GCRCN0383','GCRCM02B07','GCRCN0179','GCRCM37B13','GCRCN0376','GCRCN0456']#'gcrcn0231']#"MSR-HDP-DN0316","MSR-HDP-DN0321","MSR-HDP-DN0336","MSR-HDP-DN0377","MSR-HDP-DN0378","MSR-HDP-DN0314","MSR-HDP-DN0335","MSRQC073","MSRQC002","MSRQC015"]
+    remote_python_parent=r"\\GCR\Scratch\B99\escience\carlk\data\carlk\pythonpath05272016e"
     clean_up=False
 
     if mf == "debug":
-        runner_function = lambda ignore: LocalInParts(1,22,mkl_num_threads=1,result_file="result.p",run_dir=r"\\GCR\Scratch\RR1\escience\carlk\data\carlk\cachebio\genetics\uganda\negcoor2\runs\2015-11-11_09_43_12_2274627409")
+        runner_function = lambda ignore: LocalInParts(1000,1000,mkl_num_threads=20,result_file="result.p",run_dir=r"\\GCR\Scratch\B99\escience\carlk\data\carlk\cachebio\genetics\uganda\runs\2016-03-03_14_40_27_822760552694")
     elif mf == "local":
         runner_function = lambda ignore: Local()
     elif mf == "local1":
         runner_function = lambda ignore: Local(1)
     elif mf == "lmp":
-        runner_function = lambda ignore: LocalMultiProc(20,5)
+        runner_function = lambda ignore: LocalMultiProc(22,5)
     elif mf == "lmpl":
-        runner_function = lambda taskcount: LocalMultiProc(taskcount,20,just_one_process=True)
+        runner_function = lambda taskcount: LocalMultiProc(taskcount,22,just_one_process=True)
     elif mf == "nodeP":
-        runner_function = lambda taskcount: HPC(min(taskcount,30100), 'GCR',r"\\GCR\Scratch\RR1\escience",
+        runner_function = lambda taskcount: HPC(min(taskcount,30100), 'GCR',r"\\GCR\Scratch\B99\escience",
                                             remote_python_parent=remote_python_parent,
                                             unit='node', #core, socket, node
                                             update_remote_python_parent=True,
@@ -40,11 +40,41 @@ def mf_to_runner_function(mf):
                                             nodegroups="Preemptable",
                                             runtime="0:11:0", # day:hour:min
                                             #min = 10 #max(1,min(taskcount,110)//20)
-                                            max = 100,
+                                            #max = min(taskcount,500),
+                                            clean_up=clean_up,
+                                            )
+    elif mf == "nodeP99":
+        runner_function = lambda taskcount: HPC(min(taskcount,30100), 'GCR',r"\\GCR\Scratch\B99\escience",
+                                            remote_python_parent=remote_python_parent,
+                                            unit='node', #core, socket, node
+                                            update_remote_python_parent=True,
+                                            template="Preemptable",
+                                            priority="Lowest",
+                                            excluded_nodes=excluded_nodes,
+                                            #mkl_num_threads=20,
+                                            nodegroups="Preemptable,B99",
+                                            runtime="0:11:0", # day:hour:min
+                                            #min = 10 #max(1,min(taskcount,110)//20)
+                                            #max = min(taskcount,500),
+                                            clean_up=clean_up,
+                                            )
+    elif mf == "nodeL99":
+        runner_function = lambda taskcount: HPC(min(taskcount,30100), 'GCR',r"\\GCR\Scratch\B99\escience",
+                                            remote_python_parent=remote_python_parent,
+                                            unit='node', #core, socket, node
+                                            update_remote_python_parent=True,
+                                            template="LongRunQ",
+                                            priority="Lowest",
+                                            excluded_nodes=excluded_nodes,
+                                            #mkl_num_threads=20,
+                                            nodegroups="LongRunQ,B99",
+                                            runtime="11:0:0", # day:hour:min
+                                            #min = 10 #max(1,min(taskcount,110)//20)
+                                            #max = min(taskcount,500),
                                             clean_up=clean_up,
                                             )
     elif mf == "socketP":
-        runner_function = lambda taskcount: HPC(min(taskcount,30100), 'GCR',r"\\GCR\Scratch\RR1\escience",
+        runner_function = lambda taskcount: HPC(min(taskcount,30100), 'GCR',r"\\GCR\Scratch\B99\escience",
                                             remote_python_parent=remote_python_parent,
                                             unit='socket', #core, socket, node
                                             update_remote_python_parent=True,
@@ -58,7 +88,7 @@ def mf_to_runner_function(mf):
                                             clean_up=clean_up,
                                             )
     elif mf == "coreP":
-        runner_function = lambda taskcount: HPC(min(taskcount,1000), 'GCR',r"\\GCR\Scratch\RR1\escience",
+        runner_function = lambda taskcount: HPC(min(taskcount,1000), 'GCR',r"\\GCR\Scratch\B99\escience",
                                             remote_python_parent=remote_python_parent,
                                             unit='core', #core, socket, node
                                             update_remote_python_parent=True,
@@ -68,6 +98,22 @@ def mf_to_runner_function(mf):
                                             mkl_num_threads=1,
                                             runtime="0:11:0", # day:hour:min
                                             nodegroups="Preemptable",
+                                            #min = min(taskcount,1100)
+                                            min = 1,
+                                            max = 200 * 20,
+                                            clean_up=clean_up,
+                                            )
+    elif mf == "coreP99":
+        runner_function = lambda taskcount: HPC(min(taskcount,1000), 'GCR',r"\\GCR\Scratch\B99\escience",
+                                            remote_python_parent=remote_python_parent,
+                                            unit='core', #core, socket, node
+                                            update_remote_python_parent=True,
+                                            template="Preemptable",
+                                            priority="Lowest",
+                                            excluded_nodes=excluded_nodes,
+                                            mkl_num_threads=1,
+                                            runtime="0:11:0", # day:hour:min
+                                            nodegroups="Preemptable,B99",
                                             #min = min(taskcount,1100)
                                             min = 1,
                                             max = 200 * 20,
@@ -84,7 +130,7 @@ def mf_to_runner_function(mf):
                                             clean_up=clean_up,
                                             )
     elif mf == "nodeE":
-        runner_function = lambda taskcount: HPC(min(taskcount,10100), 'GCR',r"\\GCR\Scratch\RR1\escience",
+        runner_function = lambda taskcount: HPC(min(taskcount,10100), 'GCR',r"\\GCR\Scratch\B99\escience",
                                             remote_python_parent=remote_python_parent,
                                             unit='node', #core, socket, node
                                             update_remote_python_parent=True,
@@ -97,7 +143,7 @@ def mf_to_runner_function(mf):
                                             clean_up=clean_up,
                                             )
     elif mf == "50tasks":
-        runner_function = lambda taskcount: HPC(50, 'GCR',r"\\GCR\Scratch\RR1\escience",
+        runner_function = lambda taskcount: HPC(50, 'GCR',r"\\GCR\Scratch\B99\escience",
                                             remote_python_parent=remote_python_parent,
                                             unit='node', #core, socket, node
                                             update_remote_python_parent=True,
@@ -109,7 +155,7 @@ def mf_to_runner_function(mf):
                                             clean_up=clean_up,
                                             )
     elif mf == "coreE":
-        runner_function = lambda taskcount: HPC(min(taskcount,10100), 'GCR',r"\\GCR\Scratch\RR1\escience",
+        runner_function = lambda taskcount: HPC(min(taskcount,10100), 'GCR',r"\\GCR\Scratch\B99\escience",
                                             remote_python_parent=remote_python_parent,
                                             unit='core', #core, socket, node
                                             update_remote_python_parent=True,
@@ -121,7 +167,7 @@ def mf_to_runner_function(mf):
                                             clean_up=clean_up,
                                             )
     elif mf == "nodeA":
-        runner_function = lambda taskcount: HPC(min(taskcount,30100), 'GCR',r"\\GCR\Scratch\RR1\escience",
+        runner_function = lambda taskcount: HPC(min(taskcount,30100), 'GCR',r"\\GCR\Scratch\B99\escience",
                                             remote_python_parent=remote_python_parent,
                                             unit='node', #core, socket, node
                                             update_remote_python_parent=True,
@@ -129,7 +175,7 @@ def mf_to_runner_function(mf):
                                             clean_up=clean_up,
                                             )
     elif mf == "socketA":
-        runner_function = lambda taskcount: HPC(min(taskcount,30100), 'GCR',r"\\GCR\Scratch\RR1\escience",
+        runner_function = lambda taskcount: HPC(min(taskcount,30100), 'GCR',r"\\GCR\Scratch\B99\escience",
                                             remote_python_parent=remote_python_parent,
                                             unit='socket', #core, socket, node
                                             update_remote_python_parent=True,
@@ -137,7 +183,7 @@ def mf_to_runner_function(mf):
                                             clean_up=clean_up,
                                             )
     elif mf == "coreA":
-        runner_function = lambda taskcount: HPC(min(taskcount,30100), 'GCR',r"\\GCR\Scratch\RR1\escience",
+        runner_function = lambda taskcount: HPC(min(taskcount,30100), 'GCR',r"\\GCR\Scratch\B99\escience",
                                             remote_python_parent=remote_python_parent,
                                             unit='core', #core, socket, node
                                             update_remote_python_parent=True,

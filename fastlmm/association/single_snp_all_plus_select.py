@@ -285,7 +285,7 @@ def single_snp_all_plus_select(test_snps, pheno, G=None, covar=None,
 
                         top_k_train = top_k[train_idx,:] if k > 0 else None
                         fastlmm = FastLMM(force_full_rank=force_full_rank, force_low_rank=force_low_rank,GB_goal=GB_goal)
-                        fastlmm.fit(K0_train=K_train, K1_train=top_k_train, X=covar, y=pheno,mixing=mixing,h2=h2) #iid intersection means when can give the whole covariate and pheno
+                        fastlmm.fit(K0_train=K_train, K1_train=top_k_train, X=covar, y=pheno,mixing=mixing,h2raw=h2) #iid intersection means when can give the whole covariate and pheno
     
                         top_k_test = top_k[test_idx,:] if k > 0 else None
                         K0_whole_test = K_whole_unittrain[:,test_idx]

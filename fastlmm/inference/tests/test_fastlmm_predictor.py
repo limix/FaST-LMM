@@ -782,7 +782,7 @@ class TestFastLMM(unittest.TestCase):
                 fastlmmx = FastLMM(GB_goal=2).fit(K0_train=K0_train, X=covariate_train, y=pheno_train)
                 v2 = np.var(p2)
                 v3 = np.var(p3)
-                logging.debug("Original h2 of {0}. Generated h2 of {1}. Learned h2 of {2}".format(h2, v3/(v2+v3), fastlmmx.h2))
+                logging.debug("Original h2 of {0}. Generated h2 of {1}. Learned h2 of {2}".format(h2, v3/(v2+v3), fastlmmx.h2raw))
                 
                 
                 filename = self.tempout_dir + "/model_lmm.flm.p"

@@ -211,7 +211,8 @@ class HPC: # implements IRunner
                                 batfilename_rel[0:-8]+"nodeprep.bat", #18
                                 batfilename_rel[0:-8]+"noderelease.bat", #19
                                 1 if self.node_local else 0,             #20
-                                "" if self.clean_up else "#",            #21 if clean_up is false, comment out node release tasks
+                                "",                                      #21 always run release task
+                                ###!!!cmk delete this line#"" if self.clean_up else "#",            #21 if clean_up is false, comment out node release tasks
                                 self.preemptable,                        #22
                                 ))
         assert batfilename_rel[-8:] == "dist.bat", "real assert"
@@ -324,10 +325,10 @@ class HPC: # implements IRunner
                 with open( os.path.join(run_dir_abs,"noderelease.bat"), "w") as releasefile:
                     releasefile.write(r"""set f="{0}"{1}""".format(remotewd,'\n'))
                     releasefile.write(r"""set t="{0}"{1}""".format(nodelocalwd,'\n'))
-                    inputOutputCopier = HPCCopierNodeLocal(prepfile,releasefile) #Create the object that copies input and output files to where they are needed
-                    inputOutputCopier.input(distributable) # copy of the input files to where they are needed (i.e. the cluster)
-                    inputOutputCopier.output(distributable) # copy of the input files to where they are needed (i.e. the cluster)
-                    releasefile.write("rmdir %t%\n")
+                    inputOutputCopier = HPCCopierNodeLocal(prepfile,releasefile,self.clean_up) #Create the object that copies input and output files to where they are needed
+                    inputOutputCopier.input(distributable) # copy of the input files to where they are needed (i.e. to the cluster)
+                    inputOutputCopier.output(distributable) # copy of the output files to where they are needed (i.e. off the cluster)
+                    releasefile.write("rmdir /s %t%\n")
                     releasefile.write("exit /b 0\n")
 
 
@@ -400,17 +401,19 @@ class HPCCopier(object): #Implements ICopier
 
 class HPCCopierNodeLocal(object): #Implements ICopier
 
-    def __init__(self, fileprep, filerelease):
+    def __init__(self, fileprep, filerelease, clean_up):
         self.fileprep = fileprep
         self.filerelease = filerelease
+        self.clean_up = clean_up
 
     def input(self,item):
         if isinstance(item, str):
             itemnorm = os.path.normpath(item)
             dirname = os.path.dirname(itemnorm)
             self.fileprep.write("if not exist %t%\{0} mkdir %t%\{0}\n".format(dirname))
-            self.fileprep.write("xcopy /d /e /s /c /h /y %f%\{0} %t%\{1}\n".format(itemnorm,dirname))
-            self.filerelease.write("del %t%\{0}\n".format(itemnorm))
+            self.fileprep.write("xcopy /d /e /s /c /h /y %f%\{0} %t%\{1}\\\n".format(itemnorm,dirname))
+            if self.clean_up:
+                self.filerelease.write("del %t%\{0}\n".format(itemnorm))
         elif hasattr(item,"copyinputs"):
             item.copyinputs(self)
         # else -- do nothing
@@ -419,8 +422,9 @@ class HPCCopierNodeLocal(object): #Implements ICopier
         if isinstance(item, str):
             itemnorm = os.path.normpath(item)
             dirname = os.path.dirname(itemnorm)
-            self.filerelease.write("xcopy /d /e /s /c /h /y %t%\{0} %f%\{1}\n".format(itemnorm,dirname))
-            self.filerelease.write("del %t%\{0}\n".format(itemnorm))
+            self.filerelease.write("xcopy /d /e /s /c /h /y %t%\{0} %f%\{1}\\\n".format(itemnorm,dirname))
+            if self.clean_up:
+                self.filerelease.write("del %t%\{0}\n".format(itemnorm))
         elif hasattr(item,"copyoutputs"):
             item.copyoutputs(self)
         # else -- do nothing

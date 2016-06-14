@@ -19,6 +19,8 @@ Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "inference", "inference\infe
 EndProject
 Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "feature_selection", "feature_selection\feature_selection.pyproj", "{DB93DE74-8125-420F-A2C5-2145E80D6245}"
 EndProject
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "onemil", "..\..\Users\carlk\onemil\onemil.pyproj", "{7A32FB80-6C7C-49A3-BDAC-C3B79D8F6AE2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -39,6 +41,8 @@ Global
 		{6D8DCDF9-3776-4E1B-A713-E9B6F2A49865}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DB93DE74-8125-420F-A2C5-2145E80D6245}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{DB93DE74-8125-420F-A2C5-2145E80D6245}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7A32FB80-6C7C-49A3-BDAC-C3B79D8F6AE2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7A32FB80-6C7C-49A3-BDAC-C3B79D8F6AE2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

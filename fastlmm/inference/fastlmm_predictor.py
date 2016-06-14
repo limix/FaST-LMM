@@ -274,7 +274,7 @@ class FastLMM(object):
         self.is_fitted = False
 
 
-    def fit(self, X=None, y=None, K0_train=None, K1_train=None, h2=None, mixing=None):
+    def fit(self, X=None, y=None, K0_train=None, K1_train=None, h2raw=None, mixing=None):#!!!cmk is this h2 or h2corr????
         """
         Method for training a :class:`FastLMM` predictor. If the examples in X, y, K0_train, K1_train are not the same, they will be reordered and intersected.
 
@@ -296,10 +296,10 @@ class FastLMM(object):
                Can be PySnpTools :class:`.KernelReader`. If you give a string it can be the name of a :class:`.KernelNpz` file.
         :type K1_train: :class:`.SnpReader` or a string or :class:`.KernelReader`
 
-        :param h2: A parameter to LMM learning that tells how much weight to give the K's vs. the identity matrix, optional
+        :param h2raw: A parameter to LMM learning that tells how much weight to give the K's vs. the identity matrix, optional #!!!cmk update doc to explain h2raw w.r.t h2
                 If not given will search for best value.
                 If mixing is unspecified, then h2 must also be unspecified.
-        :type h2: number
+        :type h2raw: number
 
         :param mixing: Weight between 0.0 (inclusive, default) and 1.0 (inclusive) given to K1_train relative to K0_train.
                 If you give no mixing number and a K1_train is given, the best weight will be learned.
@@ -341,7 +341,7 @@ class FastLMM(object):
         y0 =  y.read().val #!!!later would view_ok=True,order='A' be ok because this code already did a fresh read to look for any missing values 
 
         from fastlmm.association.single_snp import _Mixer #!!!move _combine_the_best_way to another file (e.g. this one)
-        K_train, h2, mixer = _Mixer.combine_the_best_way(K0_train,K1_train,X.val,y0,mixing,h2,force_full_rank=self.force_full_rank,force_low_rank=self.force_low_rank,kernel_standardizer=self.kernel_standardizer,block_size=block_size)
+        K_train, h2raw, mixer = _Mixer.combine_the_best_way(K0_train,K1_train,X.val,y0,mixing,h2raw,force_full_rank=self.force_full_rank,force_low_rank=self.force_low_rank,kernel_standardizer=self.kernel_standardizer,block_size=block_size)
 
         # do final prediction using lmm.py
         lmm = LMM()
@@ -358,10 +358,10 @@ class FastLMM(object):
         lmm.sety(y0[:,0])
 
         # Find the best h2 and also on covariates (not given from new model)
-        if h2 is None:
+        if h2raw is None:
             res = lmm.findH2() #!!!why is REML true in the return???
         else:
-            res = lmm.nLLeval(h2=h2)
+            res = lmm.nLLeval(h2=h2raw)
 
 
         #We compute sigma2 instead of using res['sigma2'] because res['sigma2'] is only the pure noise.
@@ -370,7 +370,7 @@ class FastLMM(object):
         ###### all references to 'fastlmm_model' should be here so that we don't forget any
         self.block_size = block_size
         self.beta = res['beta']
-        self.h2 = res['h2']
+        self.h2raw = res['h2']
         self.sigma2 = full_sigma2
         self.U = lmm.U
         self.S = lmm.S
@@ -398,7 +398,7 @@ class FastLMM(object):
             new_snp += "_"
     
 
-    def score(self, X=None, y=None, K0_whole_test=None, K1_whole_test=None, iid_if_none=None, return_mse_too=False):
+    def score(self, X=None, y=None, K0_whole_test=None, K1_whole_test=None, iid_if_none=None, return_mse_too=False, return_per_iid=False):
         """
         Method for calculating the negative log likelihood of testing examples.
         If the examples in X,y,  K0_whole_test, K1_whole_test are not the same, they will be reordered and intersected.
@@ -436,14 +436,25 @@ class FastLMM(object):
         mean, covar, y = intersect_apply([mean0, covar0, y])
         mean = mean.read(order='A',view_ok=True).val
         covar = covar.read(order='A',view_ok=True).val
-        var = multivariate_normal(mean=mean.reshape(-1), cov=covar)
         y_actual = y.read().val
-        nll = -np.log(var.pdf(y_actual.reshape(-1)))
-        if not return_mse_too:
-            return nll
+        if not return_per_iid:
+            var = multivariate_normal(mean=mean.reshape(-1), cov=covar)
+            nll = -np.log(var.pdf(y_actual.reshape(-1)))
+            if not return_mse_too:
+                return nll
+            else:
+                mse = ((y_actual-mean)**2).sum()
+                return nll, mse
         else:
-            mse = ((y_actual-mean)**2).sum()
-            return nll, mse
+            if not return_mse_too:
+                result = SnpData(iid=y.iid,sid=['nLL'],val=np.empty((y.iid_count,1)),name="nLL")
+                for iid_index in xrange(y.iid_count):
+                    var = multivariate_normal(mean=mean[iid_index], cov=covar[iid_index,iid_index])
+                    nll = -np.log(var.pdf(y_actual[iid_index]))
+                    result.val[iid_index,0] = nll
+                return result
+            else:
+               raise Exception("!!!cmk need code for mse_too")                                  
 
 
     def _extract_fixup(kernel):
@@ -509,8 +520,8 @@ class FastLMM(object):
             # low rank from Rasmussen  eq 2.9 + noise term added to covar
             ###################################################
             Gstar = self.mixer.g_mix(K0_train_test,K1_train_test)
-            varg = self.h2 * self.sigma2
-            vare = (1.-self.h2) * self.sigma2
+            varg = self.h2raw * self.sigma2
+            vare = (1.-self.h2raw) * self.sigma2
             Ainv = LA.inv((1./vare) * np.dot(self.G.T,self.G) + (1./varg)*np.eye(self.G.shape[1]))
             testAinv = np.dot(Gstar.test.val, Ainv)
             pheno_predicted = np.dot(X.val,self.beta) + (1./vare) * np.dot(np.dot(testAinv,self.G.T),self.y-np.dot(self.X,self.beta))
@@ -531,7 +542,7 @@ class FastLMM(object):
             lmm.setTestData(Xstar=X.val, K0star=Kstar.val.T)
 
             Kstar_star = self.mixer.k_mix(K0_test_test,K1_test_test) #!!!later do we need/want reads here?how about view_OK?
-            pheno_predicted, covar = lmm.predict_mean_and_variance(beta=self.beta, h2=self.h2,sigma2=self.sigma2, Kstar_star=Kstar_star.val)
+            pheno_predicted, covar = lmm.predict_mean_and_variance(beta=self.beta, h2=self.h2raw,sigma2=self.sigma2, Kstar_star=Kstar_star.val)
 
         #pheno_predicted = lmm.predictMean(beta=self.beta, h2=self.h2,scale=self.sigma2).reshape(-1,1)
         ret0 = SnpData(iid = X.iid, sid=self.pheno_sid,val=pheno_predicted,pos=np.array([[np.nan,np.nan,np.nan]]),name="lmm Prediction")

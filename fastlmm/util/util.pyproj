@@ -5,8 +5,8 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{9144f8b5-632b-4a72-bd8e-01d453affb5a}</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>util.py</StartupFile>
-    <SearchPath>c:\source\carlk\fastlmm2.;c:\source\carlk\pysnptools</SearchPath>
+    <StartupFile>runner\AzureBatch.py</StartupFile>
+    <SearchPath>c:\source\carlk\fastlmm</SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
     <OutputPath>.</OutputPath>
     <Name>util</Name>
@@ -52,6 +52,12 @@
     <Compile Include="NearBronze.py" />
     <Compile Include="pickle_io.py" />
     <Compile Include="preprocess.py" />
+    <Compile Include="runner\AzureBatch.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="runner\azurehelper.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="runner\Hadoop.py" />
     <Compile Include="runner\Hadoop2.py" />
     <Compile Include="runner\HPC.py" />

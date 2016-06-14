@@ -117,7 +117,7 @@ def work_sequence_from_disk(workdirectory, taskAndWorkcount):
                 result = pickle.load(f)
             except Exception, detail:
                 raise Exception("Error trying to unpickle '{0}'. {1}".format(task_file_name,detail))
-        if taskindex % 100 == 0:
+        if True: #!!!cmk0 taskindex % 100 == 0:
             logging.info("About to yield result {0} of {1}".format(taskindex,taskAndWorkcount))
         yield result
 
@@ -207,7 +207,6 @@ class ExpandWork(object): # implements IDistributable
         self.sub_distributable = distributable
         self.sub_workcount = workcount
         self._workcount = taskcount
-        import math
         self.floor = taskcount//workcount                 #all work gets this many tasks
         self.excess = taskcount - self.floor * workcount  #but there are this many extra tasks
         self.extra_index = (self.floor + 1) * self.excess #tasks before here, get one extra task

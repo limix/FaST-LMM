@@ -199,19 +199,20 @@ class Bed(object):
             from pysnptools.snpreader import wrap_plink_parser
             SNPs = SP.zeros((iid_count_out, snp_count_out), order=order, dtype=dtype)
             bed_fn = bed.basefilename + ".bed"
+            count_A1 = False
 
             if dtype == SP.float64:
                 if order=="F":
-                    wrap_plink_parser.readPlinkBedFiledoubleFAAA(bed_fn, iid_count_in, snp_count_in, iid_index_out, snp_index_out, SNPs)
+                    wrap_plink_parser.readPlinkBedFiledoubleFAAA(bed_fn, iid_count_in, count_A1, snp_count_in, iid_index_out, snp_index_out, SNPs)#!!!cmk need to add count_A1 param
                 elif order=="C":
-                    wrap_plink_parser.readPlinkBedFiledoubleCAAA(bed_fn, iid_count_in, snp_count_in, iid_index_out, snp_index_out, SNPs)
+                    wrap_plink_parser.readPlinkBedFiledoubleCAAA(bed_fn, iid_count_in, count_A1, snp_count_in, iid_index_out, snp_index_out, SNPs)
                 else:
                     raise Exception("order '{0}' not known, only 'F' and 'C'".format(order));
             elif dtype == SP.float32:
                 if order=="F":
-                    wrap_plink_parser.readPlinkBedFilefloatFAAA(bed_fn, iid_count_in, snp_count_in, iid_index_out, snp_index_out, SNPs)
+                    wrap_plink_parser.readPlinkBedFilefloatFAAA(bed_fn, iid_count_in, count_A1, snp_count_in, iid_index_out, snp_index_out, SNPs)
                 elif order=="C":
-                    wrap_plink_parser.readPlinkBedFilefloatCAAA(bed_fn, iid_count_in, snp_count_in, iid_index_out, snp_index_out, SNPs)
+                    wrap_plink_parser.readPlinkBedFilefloatCAAA(bed_fn, iid_count_in, count_A1, snp_count_in, iid_index_out, snp_index_out, SNPs)
                 else:
                     raise Exception("dtype '{0}' not known, only float64 and float32".format(dtype))
             

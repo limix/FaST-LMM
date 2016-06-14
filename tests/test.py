@@ -166,12 +166,12 @@ if __name__ == '__main__':
                                     fastlmm.inference.tests.test_linear_regression.getTestSuite(),
                                     ])
     
-    if True: #Standard test run
+    if False: #Standard test run
         r = unittest.TextTestRunner(failfast=False)
         r.run(suites)
     else: #Cluster test run
         task_count = 150
-        remote_python_parent=r"\\GCR\Scratch\RR1\escience\carlk\data\carlk\pythonpathdel02122016c"
+        remote_python_parent=r"\\GCR\Scratch\RR1\escience\carlk\data\carlk\pythonpath03102016"
 
         #Because both pysnptools and fastlmm contain a tests folder, to run on cluster must have fastlmm listed first.
         runner = HPC(task_count, 'GCR',r"\\GCR\Scratch\RR1\escience",

@@ -326,15 +326,17 @@ def create_directory_if_necessary(name, isfile=True, robust=False):
                     raise Exception("not valid path: '{0}'. (Working directory is '{1}'".format(directory_name,os.getcwd()))
         else:
             is_ok = False
-            for i in xrange(10):
+            time_to_sleep = 10.0
+            for i in xrange(25):
                 try:
                     os.makedirs(directory_name)
                     is_ok = True
                     break
                 except OSError, e:
                     if not os.path.isdir(directory_name):
-                        warnings.warn("creating directory robust=True, try#{0}, error: not valid path: '{1}'. (Working directory is '{2}'".format(i, directory_name,os.getcwd()))
-                        time.sleep(10) ; #make random?
+                        time_to_sleep *= 1.1
+                        warnings.warn("creating directory robust=True, try#{0},time={3} error: not valid path: '{1}'. (Working directory is '{2}'".format(i, directory_name,os.getcwd(),int(time_to_sleep)))
+                        time.sleep(int(time_to_sleep)) ; #make random?
                     else:
                         is_ok = True
                         break

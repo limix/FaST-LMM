@@ -51,16 +51,29 @@ def spatial_similarity(spatial_coor, alpha, power):     # scale spatial coordina
                   (sklearn.metrics.pairwise_distances(spatial_coor) /alpha)**power
                   )
 
-def work_item(arg_tuple):               
-    (pheno, G_kernel, spatial_coor, spatial_iid, alpha,alpha_power,    # The main inputs
+def work_item(arg_tuple):
+    return work_item2(*arg_tuple)
+
+def work_item2(pheno, G_kernel, spatial_coor, spatial_iid, alpha, alpha_power,    # The main inputs
      (jackknife_index, jackknife_count, jackknife_seed),               # Jackknifing and permutations inputs
      (permute_plus_index, permute_plus_count, permute_plus_seed),
      (permute_times_index, permute_times_count, permute_times_seed),
-     just_testing, do_uncorr, do_gxe2, a2) = arg_tuple                 # Shortcutting work
+     just_testing, do_uncorr, do_gxe2, a2): 
+    
+    #########################################
+    # Load GPS info from filename if that's the way it is given
+    ########################################
+    if isinstance(spatial_coor,str):
+        assert spatial_iid is None, "if spatial_coor is a str, then spatial_iid should be None"
+        gps_table = pd.read_table(spatial_coor, delimiter=" ").dropna()
+        spatial_iid = np.array([(v,v) for v in gps_table["id"].values])
+        spatial_coor = gps_table[["south_new", "east_new"]].as_matrix()
+
 
     #########################################
     # Remove any missing values from pheno
-    #########################################
+    ########################################
+    assert pheno.sid_count == 1, "Expect only one pheno in work_item"
     pheno = pheno.read()
     pheno = pheno[pheno.val[:,0]==pheno.val[:,0],:] #Excludes NaN because NaN is not equal to NaN
 
@@ -132,11 +145,12 @@ def work_item(arg_tuple):
             h2, a2, nLLcorr = res1["h2"], res1["a2"], res1["nLL"]
             h2corr = h2 * (1-a2)
             e2 = h2 * a2
+            h2corr_raw = h2
         else:
-            h2corr, e2, a2, nLLcorr = 0,0,.5,0
-        logging.info("G plus E mixture: h2corr: {0}, e2: {1}, a2: {2}, nLLcorr: {3}".format(h2corr,e2,a2,nLLcorr))
+            h2corr, e2, a2, nLLcorr, h2corr_raw = 0,0,.5,0,0
+        logging.info("G plus E mixture: h2corr: {0}, e2: {1}, a2: {2}, nLLcorr: {3} (h2corr_raw:{4})".format(h2corr,e2,a2,nLLcorr,h2corr_raw))
     else:
-        h2corr, e2, nLLcorr = np.nan, np.nan, np.nan
+        h2corr, e2, nLLcorr, h2corr_raw = np.nan, np.nan, np.nan, np.nan
 
     #########################################
     # Find a2_gxe2, the best mixing for G+E_kernel and the GxE kernel
@@ -180,7 +194,7 @@ def work_item(arg_tuple):
     # Return results
     #########################################
 
-    ret = {"h2uncorr": h2uncorr, "nLLuncorr": nLLuncorr, "h2corr": h2corr, "e2":e2, "a2": a2, "nLLcorr": nLLcorr,
+    ret = {"h2uncorr": h2uncorr, "nLLuncorr": nLLuncorr, "h2corr": h2corr, "h2corr_raw": h2corr_raw,"e2":e2, "a2": a2, "nLLcorr": nLLcorr,
            "gxe2": gxe2, "a2_gxe2": a2_gxe2, "nLL_gxe2": nLL_gxe2, "alpha": alpha, "alpha_power":alpha_power, "phen": pheno.sid[0],
            "jackknife_index": jackknife_index, "jackknife_count":jackknife_count, "jackknife_seed":jackknife_seed,
            "permute_plus_index": permute_plus_index, "permute_plus_count":permute_plus_count, "permute_plus_seed":permute_plus_seed,
@@ -489,7 +503,7 @@ def heritability_spatial_correction(G_kernel, spatial_coor, spatial_iid, alpha_l
     results_corr.rename(columns={"h2uncorr SE":"SE (h2uncorr)","h2corr SE":"SE (h2corr)","e2 SE":"SE (e2)"}, inplace=True)
 
     #Rename some columns and join results
-    results_gxe2.rename(columns={"alpha":"alpha_gxe2","gxe2 SE":"SE (gxe2)"}, inplace=True)
+    results_gxe2.rename(columns={"alpha":"alpha_gxe2","gxe2 SE":"SE (gxe2)","h2corr_raw":"h2corr_raw_gxe2"}, inplace=True)
     del results_gxe2['alpha_power']
     results_gxe2.set_index(["phen"],inplace=True)
     final0 = results_corr.join(results_gxe2, on='phen')

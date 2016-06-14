@@ -7,7 +7,11 @@ from fastlmm.util.runner import *
 import os, sys
 import logging
 import fastlmm.util.util as util
-import cPickle as pickle
+try:
+    import dill as pickle
+except:
+    logging.warning("Can't import dill, so won't be able to clusterize lambda expressions. If you try, you'll get this error 'Can't pickle <type 'function'>: attribute lookup __builtin__.function failed'")
+    import cPickle as pickle
 
 class LocalInParts: # implements IRunner
 

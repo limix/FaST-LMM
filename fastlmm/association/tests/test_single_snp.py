@@ -449,6 +449,21 @@ class TestSingleSnpLeaveOutOneChrom(unittest.TestCase):
 
         self.compare_files(frame,"one_looc")
 
+    def test_two_looc(self):
+        logging.info("TestSingleSnpLeaveOutOneChrom test_two_looc")
+        test_snps = Bed(self.bedbase)
+        pheno = self.phen_fn
+        covar = self.cov_fn
+
+        output_file = self.file_name("two_looc")
+        frame = single_snp(test_snps[:,::10], pheno,
+                                  covar=covar,
+                                  output_file_name=output_file,
+                                  )
+
+        self.compare_files(frame,"two_looc")
+
+
     def test_interact_looc(self):
         logging.info("TestSingleSnpLeaveOutOneChrom test_interact_looc")
         test_snps = Bed(self.bedbase)

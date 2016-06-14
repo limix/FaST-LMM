@@ -669,7 +669,7 @@ class LMM(object):
         logdetK = np.log(Sd).sum()
 
         if (UUY is not None):#low rank part
-            logdetK+=(N - k) * np.log(denom)
+            logdetK += (N - k) * np.log(denom)
 
         if (snps is not None) and (Usnps is None):
             assert snps.shape[0] == self.Y.shape[0], "shape missmatch between snps and Y"
