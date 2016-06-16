@@ -58,6 +58,9 @@
     <Compile Include="runner\azurehelper.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="runner\delme.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="runner\Hadoop.py" />
     <Compile Include="runner\Hadoop2.py" />
     <Compile Include="runner\HPC.py" />
