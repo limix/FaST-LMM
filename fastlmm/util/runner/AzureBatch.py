@@ -31,12 +31,25 @@ if __name__ == "__main__":
     job = batchmodels.JobAddParameter(id=job_id, pool_info=batch.models.PoolInformation(pool_id="twoa1"))
     batch_client.job.add(job)
 
+    # see http://azure-sdk-for-python.readthedocs.io/en/latest/_modules/azure/batch/models/task_add_parameter.html
     task = batchmodels.TaskAddParameter(
         id="HelloWorld",
-        command_line=commonhelpers.wrap_commands_in_shell(
-            'windows', ['echo Hello world from the Batch Hello world sample!'])
+        run_elevated=True,
+        command_line=r"c:\Anaconda2\python.exe c:\user\tasks\shared\test.py"
+        #doesn't work command_line=r"python c:\user\tasks\shared\test.py"
+        #works command_line=r"cmd /c c:\Anaconda2\python.exe c:\user\tasks\shared\test.py"
+        #command_line=r"cmd /c python c:\user\tasks\shared\test.py"
+        #command_line=r"cmd /c c:\user\tasks\testbat.bat"
+        #command_line=r"cmd /c echo start & c:\Anaconda2\python.exe -c 3/0 & echo Done"
+        #command_line=r"c:\Anaconda2\python.exe -c print('ello')"
+        #command_line=r"python -c print('hello_from_python')"
+        #command_line=commonhelpers.wrap_commands_in_shell('windows', ["python -c print('hello_from_python')"]
     )
-    batch_client.task.add_collection(job_id, [task])
+
+    try:
+        batch_client.task.add_collection(job_id, [task])
+    except Exception as exception:
+        print exception
  
     commonhelpers.wait_for_tasks_to_complete(batch_client, job_id, datetime.timedelta(minutes=25))
  
@@ -46,3 +59,12 @@ if __name__ == "__main__":
  
  
     commonhelpers.print_task_output(batch_client, job_id, task_ids)
+
+# Install Python manully on both machines and then run a python cmd on the machines
+# copy python program to machine and run it
+# get iDistribute working on just two machines with pytnon already installed and no input files, just seralized input and seralized output
+# Run python w/o needing to install it on machine
+# Copy files to the machines
+# Copy python path to the machines
+# Understand HDFS and Azure storage
+# more than 2 machines (grow)
