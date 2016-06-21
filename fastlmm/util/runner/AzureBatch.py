@@ -2,6 +2,7 @@ import logging
 import datetime
 import fastlmm.util.runner.azurehelper as commonhelpers #!!!cmk is this the best way to include the code from the Azure python sample's common.helper.py?
 import os
+import pysnptools.util as pstutil
 from fastlmm.util.runner import *
 try:
     import dill as pickle
@@ -52,15 +53,18 @@ class AzureBatch: # implements IRunner
         ####################################################
         dist_filename = os.path.join(run_dir_rel, "dist.bat")
         with open(dist_filename, mode='w') as f:
-            f.write(r"""c:\Anaconda2\python.exe blobxfer.py --delete --storageaccountkey {2} --download {3} pp0 c:\user\tasks\workitems\pps\pp0 --remoteresource .
+            f.write(r"""net use z: \\fastlmm2.file.core.windows.net\anaconda /u:{3} {2}
+set path=z:\;z:\scripts\;%path%
+python.exe blobxfer.py --delete --storageaccountkey {2} --download {3} pp0 c:\user\tasks\workitems\pps\pp0 --remoteresource .
 set pythonpath=c:\user\tasks\workitems\pps\pp0
-c:\Anaconda2\python.exe c:\Anaconda2\Lib\site-packages\fastlmm\util\distributable.py distributable.p LocalInParts(%1,{0},mkl_num_threads={1})
+python.exe z:\Lib\site-packages\fastlmm\util\distributable.py distributable.p LocalInParts(%1,{0},mkl_num_threads={1},temp_dir={4})
             """
             .format(
                 self.taskcount,                         #0
                 self.mkl_num_threads,                   #1
                 storage_key,                            #2 #!!!cmk use the URL instead of the key
                 storage_account,                        #3
+                r'\"../output\"'               #4
             ))#!!!cmk need multiple blobxfer lines
 
         ####################################################
@@ -92,11 +96,12 @@ c:\Anaconda2\python.exe c:\Anaconda2\Lib\site-packages\fastlmm\util\distributabl
         batch_client = batch.BatchServiceClient(credentials,base_url=batch_service_url)
         job = batchmodels.JobAddParameter(id=job_id, pool_info=batch.models.PoolInformation(pool_id="twoa1"))
         batch_client.job.add(job)
+        job.uses_task_dependencies = True
 
         command_format_string = r"dist.bat {0}"
         task_list = []
         for taskindex in xrange(self.taskcount):
-            task = batchmodels.TaskAddParameter(
+            map_task = batchmodels.TaskAddParameter(
                 id=str(taskindex),
                 run_elevated=True,
                 resource_files=[batchmodels.ResourceFile(blob_source=distributablep_url, file_path="distributable.p"),
@@ -105,7 +110,18 @@ c:\Anaconda2\python.exe c:\Anaconda2\Lib\site-packages\fastlmm\util\distributabl
                                 ],
                 command_line=command_format_string.format(taskindex),
             )
-            task_list.append(task)
+            task_list.append(map_task)
+        reduce_task = batchmodels.TaskAddParameter(
+            id="reduce",
+            run_elevated=True,
+            resource_files=[batchmodels.ResourceFile(blob_source=distributablep_url, file_path="distributable.p"),
+                            batchmodels.ResourceFile(blob_source=blobxfer_url, file_path="blobxfer.py"),
+                            batchmodels.ResourceFile(blob_source=dist_url, file_path="dist.bat"),
+                            ],
+            command_line=command_format_string.format(taskindex),
+            depends_on = batchmodels.TaskDependencies(task_id_ranges=batchmodels.TaskIdRange(0,self.taskcount-1))
+            )
+        task_list.append(reduce_task)
 
         try:
             batch_client.task.add_collection(job_id, task_list)
@@ -116,7 +132,7 @@ c:\Anaconda2\python.exe c:\Anaconda2\Lib\site-packages\fastlmm\util\distributabl
  
  
         tasks = batch_client.task.list(job_id) 
-        task_ids = [task.id for task in tasks]
+        task_ids = [map_task.id for map_task in tasks]
  
  
         commonhelpers.print_task_output(batch_client, job_id, task_ids)
@@ -141,6 +157,8 @@ if __name__ == "__main__":
 
     if False:
         pass
+    elif False:
+        pstutil.create_directory_if_necessary(r"..\deldir\result.p")
     elif False:
         from fastlmm.util.runner.blobxfer import main as blobxfermain #https://pypi.io/project/blobxfer/
         batch_service_url, batch_account, batch_key, storage_account, storage_key = [s.strip() for s in open(os.path.expanduser("~")+"/azurebatch/cred.txt").xreadlines()] #!!!cmk make this a param????
@@ -243,12 +261,15 @@ if __name__ == "__main__":
  
         commonhelpers.print_task_output(batch_client, job_id, task_ids)
 
-# get iDistribute working on just two machines with pytnon already installed and no input files, just seralized input and seralized output
-# Run python w/o needing to install it on machine
-# Copy files to the machines
-# Copy python path to the machines
-# Understand HDFS and Azure storage
+# copy results back to blog storage
+# Create a reduce job that depends on the results
+# Copy 2+ python path to the machines
 # more than 2 machines (grow)
+# Copy input files to the machines
+# Run python w/o needing to install it on machine
+# Understand HDFS and Azure storage
 
+# DONE Copy 1 python path to the machines
 # DONE # copy python program to machine and run it
 # DONE Install Python manully on both machines and then run a python cmd on the machines
+# DONE get iDistribute working on just two machines with pytnon already installed and no input files, just seralized input and seralized output

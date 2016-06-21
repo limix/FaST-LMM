@@ -15,7 +15,7 @@ except:
 
 class LocalInParts: # implements IRunner
 
-    def __init__(self, taskindex, taskcount, mkl_num_threads, result_file=None, run_dir=".", logging_handler=logging.StreamHandler(sys.stdout)):
+    def __init__(self, taskindex, taskcount, mkl_num_threads, result_file=None, run_dir=".", temp_dir=None, logging_handler=logging.StreamHandler(sys.stdout)):
         logger = logging.getLogger()
         if not logger.handlers:
             logger.setLevel(logging.INFO)
@@ -25,6 +25,7 @@ class LocalInParts: # implements IRunner
             logger.setLevel(logging.INFO)
         logger.addHandler(logging_handler)
 
+        self.temp_dir = temp_dir
         self.run_dir = run_dir
         self.result_file = os.path.join(run_dir,result_file) if result_file else None
         self.taskindex = taskindex
@@ -34,7 +35,10 @@ class LocalInParts: # implements IRunner
 
 
     def run(self, distributable):
-        tempdir = os.path.join(self.run_dir,distributable.tempdirectory)
+        if self.temp_dir is not None:
+            tempdir = self.temp_dir
+        else:
+            tempdir = os.path.join(self.run_dir,distributable.tempdirectory)
         if self.taskindex != self.taskcount:
             JustCheckExists().input(distributable)
             return run_one_task(distributable, self.taskindex, self.taskcount, tempdir)
