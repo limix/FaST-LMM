@@ -51,21 +51,31 @@ class AzureBatch: # implements IRunner
         ####################################################
         # Create the batch program to run
         ####################################################
-        dist_filename = os.path.join(run_dir_rel, "dist.bat")
-        with open(dist_filename, mode='w') as f:
-            f.write(r"""net use z: \\fastlmm2.file.core.windows.net\anaconda /u:{3} {2}
+        for i, bat_filename in enumerate(["map.bat","reduce.bat"]):
+            dist_filename = os.path.join(run_dir_rel, bat_filename)
+            with open(dist_filename, mode='w') as f:
+                f.write(r"""net use z: \\fastlmm2.file.core.windows.net\anaconda /u:{3} {2}
 set path=z:\;z:\scripts\;%path%
+{6}mkdir ..\output\
+{6}cd ..\output\
+{6}python.exe ..\wd\blobxfer.py --delete --storageaccountkey {2} --download {3} output . --remoteresource .
+{6}cd ..\wd\
 python.exe blobxfer.py --delete --storageaccountkey {2} --download {3} pp0 c:\user\tasks\workitems\pps\pp0 --remoteresource .
 set pythonpath=c:\user\tasks\workitems\pps\pp0
-python.exe z:\Lib\site-packages\fastlmm\util\distributable.py distributable.p LocalInParts(%1,{0},mkl_num_threads={1},temp_dir={4})
-            """
-            .format(
-                self.taskcount,                         #0
-                self.mkl_num_threads,                   #1
-                storage_key,                            #2 #!!!cmk use the URL instead of the key
-                storage_account,                        #3
-                r'\"../output\"'               #4
-            ))#!!!cmk need multiple blobxfer lines
+python.exe z:\Lib\site-packages\fastlmm\util\distributable.py distributable.p LocalInParts(%1,{0},result_file=\"../output/result.p\",mkl_num_threads={1},temp_dir={4})
+cd ..\output\
+{5}python.exe ..\wd\blobxfer.py --storageaccountkey {2} --upload {3} output .
+{6}python.exe ..\wd\blobxfer.py --storageaccountkey {2} --upload {3} output result.p
+                """
+                .format(
+                    self.taskcount,                         #0
+                    self.mkl_num_threads,                   #1
+                    storage_key,                            #2 #!!!cmk use the URL instead of the key
+                    storage_account,                        #3
+                    r'\"../output\"',                       #4
+                    "" if i==0 else "@rem ",                #5
+                    "" if i==1 else "@rem ",                #6
+                ))#!!!cmk need multiple blobxfer lines
 
         ####################################################
         # Upload the thing-to-run to a blob and the blobxfer program
@@ -75,7 +85,8 @@ python.exe z:\Lib\site-packages\fastlmm\util\distributable.py distributable.p Lo
         distributablep_url = commonhelpers.upload_blob_and_create_sas(block_blob_client, 'application', "distributable.p", distributablep_filename, datetime.datetime.utcnow() + datetime.timedelta(hours=1))
         blobxfer_fn = os.path.join(os.path.dirname(__file__),"blobxfer.py")
         blobxfer_url = commonhelpers.upload_blob_and_create_sas(block_blob_client, 'application', "blobxfer.py", blobxfer_fn, datetime.datetime.utcnow() + datetime.timedelta(hours=1))
-        dist_url = commonhelpers.upload_blob_and_create_sas(block_blob_client, 'application', "dist.bat", dist_filename, datetime.datetime.utcnow() + datetime.timedelta(hours=1))
+        map_url = commonhelpers.upload_blob_and_create_sas(block_blob_client, 'application', "map.bat", os.path.join(run_dir_rel, "map.bat"), datetime.datetime.utcnow() + datetime.timedelta(hours=1))
+        reduce_url = commonhelpers.upload_blob_and_create_sas(block_blob_client, 'application', "reduce.bat", os.path.join(run_dir_rel, "reduce.bat"), datetime.datetime.utcnow() + datetime.timedelta(hours=1))
 
 
         ####################################################
@@ -94,32 +105,29 @@ python.exe z:\Lib\site-packages\fastlmm\util\distributable.py distributable.p Lo
         job_id = commonhelpers.generate_unique_resource_name(distributable.name)
         credentials = batchauth.SharedKeyCredentials(batch_account, batch_key)
         batch_client = batch.BatchServiceClient(credentials,base_url=batch_service_url)
-        job = batchmodels.JobAddParameter(id=job_id, pool_info=batch.models.PoolInformation(pool_id="twoa1"))
+        job = batchmodels.JobAddParameter(id=job_id, pool_info=batch.models.PoolInformation(pool_id="twoa1"),uses_task_dependencies=True)
         batch_client.job.add(job)
-        job.uses_task_dependencies = True
 
-        command_format_string = r"dist.bat {0}"
+        resource_files=[batchmodels.ResourceFile(blob_source=distributablep_url, file_path="distributable.p"),
+                batchmodels.ResourceFile(blob_source=blobxfer_url, file_path="blobxfer.py"),
+                batchmodels.ResourceFile(blob_source=map_url, file_path="map.bat"),
+                batchmodels.ResourceFile(blob_source=reduce_url, file_path="reduce.bat"),
+                ]
         task_list = []
         for taskindex in xrange(self.taskcount):
             map_task = batchmodels.TaskAddParameter(
                 id=str(taskindex),
                 run_elevated=True,
-                resource_files=[batchmodels.ResourceFile(blob_source=distributablep_url, file_path="distributable.p"),
-                                batchmodels.ResourceFile(blob_source=blobxfer_url, file_path="blobxfer.py"),
-                                batchmodels.ResourceFile(blob_source=dist_url, file_path="dist.bat"),
-                                ],
-                command_line=command_format_string.format(taskindex),
+                resource_files=resource_files,
+                command_line="map.bat {0}".format(taskindex),
             )
             task_list.append(map_task)
         reduce_task = batchmodels.TaskAddParameter(
             id="reduce",
             run_elevated=True,
-            resource_files=[batchmodels.ResourceFile(blob_source=distributablep_url, file_path="distributable.p"),
-                            batchmodels.ResourceFile(blob_source=blobxfer_url, file_path="blobxfer.py"),
-                            batchmodels.ResourceFile(blob_source=dist_url, file_path="dist.bat"),
-                            ],
-            command_line=command_format_string.format(taskindex),
-            depends_on = batchmodels.TaskDependencies(task_id_ranges=batchmodels.TaskIdRange(0,self.taskcount-1))
+            resource_files=resource_files,
+            command_line="reduce.bat".format(self.taskcount),
+            depends_on = batchmodels.TaskDependencies(task_id_ranges=[batchmodels.TaskIdRange(0,self.taskcount-1)])
             )
         task_list.append(reduce_task)
 
@@ -136,6 +144,16 @@ python.exe z:\Lib\site-packages\fastlmm\util\distributable.py distributable.p Lo
  
  
         commonhelpers.print_task_output(batch_client, job_id, task_ids)
+
+        ####################################################
+        # Download and Unpickle the result
+        ####################################################
+        resultp_filename = os.path.join(run_dir_rel, "result.p")
+        blobxfer(r"blobxfer.py --storageaccountkey {} --download {} output . --remoteresource result.p".format(storage_key,storage_account), wd=run_dir_rel)
+        with open(resultp_filename, mode='rb') as f:
+            result = pickle.load(f)
+        return result
+
 
 def test_fun(runner):
     from fastlmm.util.mapreduce import map_reduce
@@ -261,14 +279,16 @@ if __name__ == "__main__":
  
         commonhelpers.print_task_output(batch_client, job_id, task_ids)
 
-# copy results back to blog storage
-# Create a reduce job that depends on the results
+# Faster install of Python
 # Copy 2+ python path to the machines
 # more than 2 machines (grow)
 # Copy input files to the machines
+# Can run multiple jobs at once and they don't clobber each other
 # Run python w/o needing to install it on machine
 # Understand HDFS and Azure storage
 
+# DONE copy results back to blog storage
+# DONE Create a reduce job that depends on the results
 # DONE Copy 1 python path to the machines
 # DONE # copy python program to machine and run it
 # DONE Install Python manully on both machines and then run a python cmd on the machines
