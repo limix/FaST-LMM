@@ -22,7 +22,7 @@ except Exception as exp:
     pass
 
 class AzureBatch: # implements IRunner
-    def __init__(self, taskcount, mkl_num_threads = None, logging_handler=logging.StreamHandler(sys.stdout)):
+    def __init__(self, task_count, min_node_count, max_node_count, mkl_num_threads = None, logging_handler=logging.StreamHandler(sys.stdout)):
         logger = logging.getLogger() #!!!cmk similar code elsewhere
         if not logger.handlers:
             logger.setLevel(logging.INFO)
@@ -32,7 +32,9 @@ class AzureBatch: # implements IRunner
             logger.setLevel(logging.INFO)
         logger.addHandler(logging_handler)
 
-        self.taskcount = taskcount
+        self.taskcount = task_count
+        self.min_node_count = min_node_count
+        self.max_node_count = max_node_count
         self.mkl_num_threads = mkl_num_threads
 
     def run(self, distributable):
@@ -54,14 +56,14 @@ class AzureBatch: # implements IRunner
         for i, bat_filename in enumerate(["map.bat","reduce.bat"]):
             dist_filename = os.path.join(run_dir_rel, bat_filename)
             with open(dist_filename, mode='w') as f:
-                f.write(r"""set path=%AZ_BATCH_APP_PACKAGE_ANACONDA2%;%AZ_BATCH_APP_PACKAGE_ANACONDA2%\scripts\;%path%
+                f.write(r"""set path=%AZ_BATCH_APP_PACKAGE_ANACONDA2%\Anaconda2;%AZ_BATCH_APP_PACKAGE_ANACONDA2%\Anaconda2\scripts\;%path%
 {6}mkdir ..\output\
 {6}cd ..\output\
 {6}python.exe ..\wd\blobxfer.py --delete --storageaccountkey {2} --download {3} output . --remoteresource .
 {6}cd ..\wd\
-python.exe blobxfer.py --delete --storageaccountkey {2} --download {3} pp0 c:\user\tasks\workitems\pps\pp0 --remoteresource .
+python.exe blobxfer.py --skipskip --delete --storageaccountkey {2} --download {3} pp0 c:\user\tasks\workitems\pps\pp0 --remoteresource .
 set pythonpath=c:\user\tasks\workitems\pps\pp0
-python.exe z:\Lib\site-packages\fastlmm\util\distributable.py distributable.p LocalInParts(%1,{0},result_file=\"../output/result.p\",mkl_num_threads={1},temp_dir={4})
+python.exe %AZ_BATCH_APP_PACKAGE_ANACONDA2%\Anaconda2\Lib\site-packages\fastlmm\util\distributable.py distributable.p LocalInParts(%1,{0},result_file=\"../output/result.p\",mkl_num_threads={1},temp_dir={4})
 cd ..\output\
 {5}python.exe ..\wd\blobxfer.py --storageaccountkey {2} --upload {3} output .
 {6}python.exe ..\wd\blobxfer.py --storageaccountkey {2} --upload {3} output result.p
@@ -94,16 +96,42 @@ cd ..\output\
         localpythonpath = os.environ.get("PYTHONPATH") #!!should it be able to work without pythonpath being set (e.g. if there was just one file)? Also, is None really the return or is it an exception.
         if localpythonpath == None: raise Exception("Expect local machine to have 'pythonpath' set")
         for i, localpathpart in enumerate(localpythonpath.split(';')):
-            blobxfer(r"blobxfer.py --delete --storageaccountkey {} --upload {} {} {}".format(storage_key,storage_account,"pp{}".format(i),"."),
+            blobxfer(r"blobxfer.py --skipskip --delete --storageaccountkey {} --upload {} {} {}".format(storage_key,storage_account,"pp{}".format(i),"."),
                      wd=localpathpart)
     
+
+        ####################################################
+        # Set the pool's autoscale
+        # http://azure-sdk-for-python.readthedocs.io/en/dev/batch.html
+        # https://azure.microsoft.com/en-us/documentation/articles/batch-automatic-scaling/ (enable after)
+        # https://azure.microsoft.com/en-us/documentation/articles/batch-parallel-node-tasks/
+        ####################################################
+        credentials = batchauth.SharedKeyCredentials(batch_account, batch_key)
+        batch_client = batch.BatchServiceClient(credentials,base_url=batch_service_url)
+        auto_scale_formula=r"""// Get pending tasks for the past 15 minutes.
+$Samples = $ActiveTasks.GetSamplePercent(TimeInterval_Minute * 15);
+// If we have fewer than 70 percent data points, we use the last sample point, otherwise we use the maximum of
+// last sample point and the history average.
+$Tasks = $Samples < 70 ? max(0,$ActiveTasks.GetSample(1)) : max( $ActiveTasks.GetSample(1), avg($ActiveTasks.GetSample(TimeInterval_Minute * 15)));
+// If number of pending tasks is not 0, set targetVM to pending tasks, otherwise half of current dedicated.
+$TargetVMs = $Tasks > 0? $Tasks:max(0, $TargetDedicated/2);
+// The pool size is capped at 20, if target VM value is more than that, set it to 20. This value
+// should be adjusted according to your use case.
+$TargetDedicated = max({0},min($TargetVMs,{1}));
+// Set node deallocation mode - keep nodes active only until tasks finish
+$NodeDeallocationOption = taskcompletion;
+""".format(self.min_node_count,self.max_node_count)
+        #batch_client.pool.enable_auto_scale(
+        #        "twoa1",
+        #        auto_scale_formula=auto_scale_formula,
+        #        auto_scale_evaluation_interval=datetime.timedelta(minutes=10) 
+        #    )
+
 
         ####################################################
         # Create a job with tasks and run it.
         ####################################################
         job_id = commonhelpers.generate_unique_resource_name(distributable.name)
-        credentials = batchauth.SharedKeyCredentials(batch_account, batch_key)
-        batch_client = batch.BatchServiceClient(credentials,base_url=batch_service_url)
         job = batchmodels.JobAddParameter(id=job_id, pool_info=batch.models.PoolInformation(pool_id="twoa1"),uses_task_dependencies=True)
         batch_client.job.add(job)
 
@@ -125,7 +153,7 @@ cd ..\output\
             id="reduce",
             run_elevated=True,
             resource_files=resource_files,
-            command_line="reduce.bat".format(self.taskcount),
+            command_line="reduce.bat {0}".format(self.taskcount),
             depends_on = batchmodels.TaskDependencies(task_id_ranges=[batchmodels.TaskIdRange(0,self.taskcount-1)])
             )
         task_list.append(reduce_task)
@@ -134,6 +162,7 @@ cd ..\output\
             batch_client.task.add_collection(job_id, task_list)
         except Exception as exception:
             print exception
+            raise exception
  
         commonhelpers.wait_for_tasks_to_complete(batch_client, job_id, datetime.timedelta(minutes=25))
  
@@ -160,7 +189,7 @@ def test_fun(runner):
         print x
         return x**2
 
-    result = map_reduce(range(4),
+    result = map_reduce(range(100),
                         mapper=printx,
                         name="printx",
                         runner = runner
@@ -201,13 +230,6 @@ if __name__ == "__main__":
         print "done"
 
 
-    elif True:
-        from fastlmm.util.runner.AzureBatch import test_fun
-        from fastlmm.util.runner import Local, HPC, LocalMultiProc
-
-        runner = AzureBatch(2)
-        #runner = LocalMultiProc(2)
-        test_fun(runner)
     elif False:
 
         #Expect:
@@ -277,17 +299,28 @@ if __name__ == "__main__":
  
  
         commonhelpers.print_task_output(batch_client, job_id, task_ids)
+    elif True:
+        from fastlmm.util.runner.AzureBatch import test_fun
+        from fastlmm.util.runner import Local, HPC, LocalMultiProc
 
-# Faster install of Python
-# See http://gonzowins.com/2015/11/06/deploying-apps-into-azurebatch/ from how copy zip and then unzip
-#             also https://www.opsgility.com/blog/2012/11/08/bootstrapping-a-virtual-machine-with-windows-azure/        
-# Copy 2+ python path to the machines
+        runner = AzureBatch(task_count=99,min_node_count=2,max_node_count=7) #!!!cmk there is a default core limit of 99
+        #runner = LocalMultiProc(2)
+        test_fun(runner)
+
 # more than 2 machines (grow)
+# When there is an error, say so, don't just return the result from the previous good run
+# Upload of answers is too noisy
+# Look at # https://azure.microsoft.com/en-us/documentation/articles/batch-parallel-node-tasks/
 # Copy input files to the machines
 # Can run multiple jobs at once and they don't clobber each other
-# Run python w/o needing to install it on machine
+# Copy 2+ python path to the machines
 # Understand HDFS and Azure storage
+# Stop using fastlmm2 for storage
+# control the default core limit so can have more than taskcount=99
 
+# DONE Faster install of Python
+# DONE See http://gonzowins.com/2015/11/06/deploying-apps-into-azurebatch/ from how copy zip and then unzip
+# DONE            also https://www.opsgility.com/blog/2012/11/08/bootstrapping-a-virtual-machine-with-windows-azure/        
 # DONE copy results back to blog storage
 # DONE Create a reduce job that depends on the results
 # DONE Copy 1 python path to the machines

@@ -1589,7 +1589,7 @@ def run_command_string(command_string, wd=None):
         os.chdir(wd)
 
     sys.argv = command_string.split(" ")
-    main(exit_is_ok=False,skip_skip=True)
+    main(exit_is_ok=False)
 
     if wd is not None:
         os.chdir(temp2)
@@ -1807,15 +1807,19 @@ def generate_xferspec_download(
     # check if download is needed
     if (args.skiponmatch and contentmd5 is not None and
             os.path.exists(localfile)):
-        print('computing file md5 on: {} length: {}'.format(
-            localfile, contentlength))
+        if not args.skipskip: #!!!cmk
+            print('computing file md5 on: {} length: {}'.format(
+                localfile, contentlength))
         lmd5 = compute_md5_for_file_asbase64(localfile)
-        print('  >> {} <L..R> {} {} '.format(
-            lmd5, contentmd5, remoteresource), end='')
         if lmd5 != contentmd5:
+            print('  >> {} <L..R> {} {} '.format(
+                lmd5, contentmd5, remoteresource), end='')
             print('MISMATCH: re-download')
         else:
-            print('match: skip')
+            if not args.skipskip: #!!!cmk
+                print('  >> {} <L..R> {} {} '.format(
+                    lmd5, contentmd5, remoteresource), end='')
+                print('match: skip')
             return None, None, None, None
     else:
         print('remote blob: {} length: {} bytes, md5: {}'.format(
@@ -1906,7 +1910,7 @@ def generate_xferspec_download(
 
 def generate_xferspec_upload(
         args, storage_in_queue, blobskipdict, blockids, localfile,
-        remoteresource, addfd, skip_skip=False):
+        remoteresource, addfd):
     """Generate an xferspec for upload
     Parameters:
         args - program arguments
@@ -1924,7 +1928,7 @@ def generate_xferspec_upload(
     # compute md5 hash
     md5digest = None
     if args.computefilemd5:
-        if not skip_skip: #!!!cmk
+        if not args.skipskip: #!!!cmk
             print('computing file md5 on: {}'.format(localfile))
         md5digest = compute_md5_for_file_asbase64(
             localfile, as_page_blob(args, localfile))
@@ -1937,14 +1941,15 @@ def generate_xferspec_upload(
                     remoteresource), end='')
                 print('MISMATCH: re-upload')
             else:
-                if not skip_skip: #!!!cmk
+                if not args.skipskip: #!!!cmk
                     print('  >> {} <L..R> {} {} '.format(
                         md5digest, blobskipdict[remoteresource_key][1],
                         remoteresource), end='')
                     print('match: skip')
                 return None, 0, None, None
         else:
-            print('  >> md5: {}'.format(md5digest))
+            if not args.skipskip: #!!!cmk
+                print('  >> md5: {}'.format(md5digest))
     # create blockids entry
     if localfile not in blockids:
         blockids[localfile] = []
@@ -2028,7 +2033,7 @@ def apply_file_collation_and_strip(args, fname):
     return remotefname
 
 
-def main(exit_is_ok=True, skip_skip=False):
+def main(exit_is_ok=True):
     """Main function
     Parameters:
         None
@@ -2364,7 +2369,7 @@ def main(exit_is_ok=True, skip_skip=False):
                         filesize, ops, md5digest, filedesc = \
                             generate_xferspec_upload(
                                 args, storage_in_queue, blobskipdict,
-                                blockids, fname, remotefname, False, skip_skip=skip_skip)
+                                blockids, fname, remotefname, False)
                         if filesize is not None:
                             completed_blockids[fname] = 0
                             md5map[fname] = md5digest
@@ -2989,6 +2994,9 @@ def parseargs():  # pragma: no cover
         '--saskey',
         help='SAS key to use, if recursive upload or container download, '
         'this must be a container SAS')
+    parser.add_argument( #!!!cmk
+        '--skipskip', action='store_true',
+        help='skip messages about computing md5 and skipping files')
     parser.add_argument(
         '--storageaccountkey',
         help='storage account shared key')
