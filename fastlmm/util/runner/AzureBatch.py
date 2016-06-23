@@ -2,8 +2,11 @@ import logging
 import datetime
 import fastlmm.util.runner.azurehelper as commonhelpers #!!!cmk is this the best way to include the code from the Azure python sample's common.helper.py?
 import os
+import time
 import pysnptools.util as pstutil
 from fastlmm.util.runner import *
+from collections import Counter
+
 try:
     import dill as pickle
 except:
@@ -164,14 +167,22 @@ $NodeDeallocationOption = taskcompletion;
             print exception
             raise exception
  
-        commonhelpers.wait_for_tasks_to_complete(batch_client, job_id, datetime.timedelta(minutes=25))
+        sleep_sec = 5
+        while True:
+            logging.info("again")
+            tasks = batch_client.task.list(job_id)
+            counter = Counter(task.state.value for task in tasks)
+            for state, count in counter.iteritems():
+                logging.info("{0}: {1}".format(state, count))
+            if counter['completed'] == sum(counter.values()) :
+                break
+            time.sleep(sleep_sec)
+            sleep_sec = min(sleep_sec * 1.1,60)
  
  
-        tasks = batch_client.task.list(job_id) 
-        task_ids = [map_task.id for map_task in tasks]
- 
- 
-        commonhelpers.print_task_output(batch_client, job_id, task_ids)
+        #tasks = batch_client.task.list(job_id) 
+        #task_ids = [map_task.id for map_task in tasks]
+        #commonhelpers.print_task_output(batch_client, job_id, task_ids)
 
         ####################################################
         # Download and Unpickle the result
@@ -189,7 +200,7 @@ def test_fun(runner):
         print x
         return x**2
 
-    result = map_reduce(range(100),
+    result = map_reduce(range(1000),
                         mapper=printx,
                         name="printx",
                         runner = runner
@@ -303,21 +314,26 @@ if __name__ == "__main__":
         from fastlmm.util.runner.AzureBatch import test_fun
         from fastlmm.util.runner import Local, HPC, LocalMultiProc
 
-        runner = AzureBatch(task_count=99,min_node_count=2,max_node_count=7) #!!!cmk there is a default core limit of 99
+        runner = AzureBatch(task_count=20,min_node_count=2,max_node_count=7) #!!!cmk there is a default core limit of 99
         #runner = LocalMultiProc(2)
         test_fun(runner)
 
-# more than 2 machines (grow)
-# When there is an error, say so, don't just return the result from the previous good run
-# Upload of answers is too noisy
-# Look at # https://azure.microsoft.com/en-us/documentation/articles/batch-parallel-node-tasks/
 # Copy input files to the machines
+# When there is an error, say so, don't just return the result from the previous good run
+# Look at # https://azure.microsoft.com/en-us/documentation/articles/batch-parallel-node-tasks/
 # Can run multiple jobs at once and they don't clobber each other
 # Copy 2+ python path to the machines
 # Understand HDFS and Azure storage
 # Stop using fastlmm2 for storage
 # control the default core limit so can have more than taskcount=99
+# is 'datetime.timedelta(minutes=25)' right?
 
+# DONE Don't copy stdout stderr back
+# DONE instead of Datetime with no tzinfo will be considered UTC.
+#            Checking if all tasks are complete...
+#      tell how many tasks finished, running, waiting
+# DONE Upload of answers is too noisy
+# DONE more than 2 machines (grow)
 # DONE Faster install of Python
 # DONE See http://gonzowins.com/2015/11/06/deploying-apps-into-azurebatch/ from how copy zip and then unzip
 # DONE            also https://www.opsgility.com/blog/2012/11/08/bootstrapping-a-virtual-machine-with-windows-azure/        
