@@ -54,8 +54,7 @@ class AzureBatch: # implements IRunner
         for i, bat_filename in enumerate(["map.bat","reduce.bat"]):
             dist_filename = os.path.join(run_dir_rel, bat_filename)
             with open(dist_filename, mode='w') as f:
-                f.write(r"""net use z: \\fastlmm2.file.core.windows.net\anaconda /u:{3} {2}
-set path=z:\;z:\scripts\;%path%
+                f.write(r"""set path=%AZ_BATCH_APP_PACKAGE_ANACONDA2%;%AZ_BATCH_APP_PACKAGE_ANACONDA2%\scripts\;%path%
 {6}mkdir ..\output\
 {6}cd ..\output\
 {6}python.exe ..\wd\blobxfer.py --delete --storageaccountkey {2} --download {3} output . --remoteresource .
@@ -280,6 +279,8 @@ if __name__ == "__main__":
         commonhelpers.print_task_output(batch_client, job_id, task_ids)
 
 # Faster install of Python
+# See http://gonzowins.com/2015/11/06/deploying-apps-into-azurebatch/ from how copy zip and then unzip
+#             also https://www.opsgility.com/blog/2012/11/08/bootstrapping-a-virtual-machine-with-windows-azure/        
 # Copy 2+ python path to the machines
 # more than 2 machines (grow)
 # Copy input files to the machines

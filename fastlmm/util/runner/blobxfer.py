@@ -1589,7 +1589,7 @@ def run_command_string(command_string, wd=None):
         os.chdir(wd)
 
     sys.argv = command_string.split(" ")
-    main(exit_is_ok=False)
+    main(exit_is_ok=False,skip_skip=True)
 
     if wd is not None:
         os.chdir(temp2)
@@ -1906,7 +1906,7 @@ def generate_xferspec_download(
 
 def generate_xferspec_upload(
         args, storage_in_queue, blobskipdict, blockids, localfile,
-        remoteresource, addfd):
+        remoteresource, addfd, skip_skip=False):
     """Generate an xferspec for upload
     Parameters:
         args - program arguments
@@ -1924,19 +1924,24 @@ def generate_xferspec_upload(
     # compute md5 hash
     md5digest = None
     if args.computefilemd5:
-        print('computing file md5 on: {}'.format(localfile))
+        if not skip_skip: #!!!cmk
+            print('computing file md5 on: {}'.format(localfile))
         md5digest = compute_md5_for_file_asbase64(
             localfile, as_page_blob(args, localfile))
         # check if upload is needed
         remoteresource_key = remoteresource.replace("\\","/") #!!!cmk
         if args.skiponmatch and remoteresource_key in blobskipdict:
-            print('  >> {} <L..R> {} {} '.format(
-                md5digest, blobskipdict[remoteresource_key][1],
-                remoteresource), end='')
             if md5digest != blobskipdict[remoteresource_key][1]:
+                print('  >> {} <L..R> {} {} '.format(
+                    md5digest, blobskipdict[remoteresource_key][1],
+                    remoteresource), end='')
                 print('MISMATCH: re-upload')
             else:
-                print('match: skip')
+                if not skip_skip: #!!!cmk
+                    print('  >> {} <L..R> {} {} '.format(
+                        md5digest, blobskipdict[remoteresource_key][1],
+                        remoteresource), end='')
+                    print('match: skip')
                 return None, 0, None, None
         else:
             print('  >> md5: {}'.format(md5digest))
@@ -2023,7 +2028,7 @@ def apply_file_collation_and_strip(args, fname):
     return remotefname
 
 
-def main(exit_is_ok=True):
+def main(exit_is_ok=True, skip_skip=False):
     """Main function
     Parameters:
         None
@@ -2359,7 +2364,7 @@ def main(exit_is_ok=True):
                         filesize, ops, md5digest, filedesc = \
                             generate_xferspec_upload(
                                 args, storage_in_queue, blobskipdict,
-                                blockids, fname, remotefname, False)
+                                blockids, fname, remotefname, False, skip_skip=skip_skip)
                         if filesize is not None:
                             completed_blockids[fname] = 0
                             md5map[fname] = md5digest
