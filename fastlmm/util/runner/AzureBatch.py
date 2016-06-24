@@ -54,6 +54,17 @@ class AzureBatch: # implements IRunner
             pickle.dump(distributable, f, pickle.HIGHEST_PROTOCOL)
 
         ####################################################
+        # Copy (update) any input files to the blob and create scripts for running on the nodes
+        ####################################################
+        inputOutputCopier = AzureBatchCopier("inputfiles",storage_key, storage_account)
+        inputOutputCopier.input(distributable)
+
+        script_list = ["",""]
+        inputOutputCopier2 = AzureBatchCopierNodeLocal("inputfiles",storage_key, storage_account,script_list)
+        inputOutputCopier2.input(distributable)
+        inputOutputCopier2.output(distributable)
+
+        ####################################################
         # Create the batch program to run
         ####################################################
         for i, bat_filename in enumerate(["map.bat","reduce.bat"]):
@@ -64,9 +75,11 @@ class AzureBatch: # implements IRunner
 {6}cd ..\output\
 {6}python.exe ..\wd\blobxfer.py --delete --storageaccountkey {2} --download {3} output . --remoteresource .
 {6}cd ..\wd\
+{7}
 python.exe blobxfer.py --skipskip --delete --storageaccountkey {2} --download {3} pp0 c:\user\tasks\workitems\pps\pp0 --remoteresource .
 set pythonpath=c:\user\tasks\workitems\pps\pp0
 python.exe %AZ_BATCH_APP_PACKAGE_ANACONDA2%\Anaconda2\Lib\site-packages\fastlmm\util\distributable.py distributable.p LocalInParts(%1,{0},result_file=\"../output/result.p\",mkl_num_threads={1},temp_dir={4})
+{6}{8}
 cd ..\output\
 {5}python.exe ..\wd\blobxfer.py --storageaccountkey {2} --upload {3} output .
 {6}python.exe ..\wd\blobxfer.py --storageaccountkey {2} --upload {3} output result.p
@@ -79,6 +92,8 @@ cd ..\output\
                     r'\"../output\"',                       #4
                     "" if i==0 else "@rem ",                #5
                     "" if i==1 else "@rem ",                #6
+                    script_list[0],                         #7
+                    script_list[1],                         #8
                 ))#!!!cmk need multiple blobxfer lines
 
         ####################################################
@@ -185,6 +200,11 @@ $NodeDeallocationOption = taskcompletion;
         #commonhelpers.print_task_output(batch_client, job_id, task_ids)
 
         ####################################################
+        # Copy (update) any output files from the blob
+        ####################################################
+        inputOutputCopier.output(distributable)
+
+        ####################################################
         # Download and Unpickle the result
         ####################################################
         resultp_filename = os.path.join(run_dir_rel, "result.p")
@@ -193,16 +213,80 @@ $NodeDeallocationOption = taskcompletion;
             result = pickle.load(f)
         return result
 
+class AzureBatchCopier(object): #Implements ICopier
+
+    def __init__(self, container, storage_key, storage_account):
+        self.container = container
+        self.storage_key=storage_key
+        self.storage_account=storage_account
+
+    def input(self,item):
+        if isinstance(item, str):
+            itemnorm = "./"+os.path.normpath(item)
+            blobxfer(r"blobxfer.py --skipskip --storageaccountkey {} --upload {} {} {}".format(self.storage_key,self.storage_account,self.container,itemnorm),wd=".")
+        elif hasattr(item,"copyinputs"):
+            item.copyinputs(self)
+        # else -- do nothing
+
+    def output(self,item):
+        if isinstance(item, str):
+            itemnorm = "./"+os.path.normpath(item)
+            blobxfer(r"blobxfer.py --skipskip --storageaccountkey {} --download {} {} {} --remoteresource {}".format(self.storage_key,self.storage_account,self.container, ".", itemnorm), wd=".")
+            print "test!!!cmk"
+        elif hasattr(item,"copyoutputs"):
+            item.copyoutputs(self)
+        # else -- do nothing
+
+class AzureBatchCopierNodeLocal(object): #Implements ICopier
+
+    def __init__(self, container, storage_key, storage_account, script_list):
+        assert len(script_list) == 2, "expect script list to be a list of length two"
+        script_list[0] = ""
+        script_list[1] = ""
+        self.container = container
+        self.storage_key=storage_key
+        self.storage_account=storage_account
+        self.script_list = script_list
+
+    def input(self,item):
+        if isinstance(item, str):
+            itemnorm = "./"+os.path.normpath(item)
+            self.script_list[0] += r"python.exe ..\wd\blobxfer.py --storageaccountkey {} --download {} {} {} --remoteresource {}{}".format(self.storage_key,self.storage_account,self.container, ".", itemnorm, os.linesep)
+        elif hasattr(item,"copyinputs"):
+            item.copyinputs(self)
+        # else -- do nothing
+
+    def output(self,item):
+        if isinstance(item, str):
+            itemnorm = "./"+os.path.normpath(item)
+            self.script_list[1] += r"python.exe ..\wd\blobxfer.py --storageaccountkey {} --upload {} {} {} --remoteresource {}{}".format(self.storage_key,self.storage_account,self.container, ".", itemnorm, os.linesep)
+        elif hasattr(item,"copyoutputs"):
+            item.copyoutputs(self)
+        # else -- do nothing
+
 
 def test_fun(runner):
     from fastlmm.util.mapreduce import map_reduce
+    import shutil
+
+    os.chdir(r"c:\deldir\del1")
+
     def printx(x):
-        print x
-        return x**2
+        a =  os.path.getsize("data/del2.txt")
+        b =  os.path.getsize("data/del3/text.txt")
+        print x**2
+        return [x**2, a, b, "hello"]
+
+    def reducerx(sequence):
+        shutil.copy2('data/del3/text.txt', 'data/del3/text2.txt')
+        return list(sequence)
 
     result = map_reduce(range(1000),
                         mapper=printx,
+                        reducer=reducerx,
                         name="printx",
+                        input_files=["data/del2.txt","data/del3/text.txt"],
+                        output_files=["data/del3/text2.txt"],
                         runner = runner
                         )
     print result
@@ -319,6 +403,11 @@ if __name__ == "__main__":
         test_fun(runner)
 
 # Copy input files to the machines
+# copy output files from the machine
+# make sure every use of storage: locally, in blobs, and on nodes, is sensable
+# make sure that things stop when there is an error
+# If multiple jobs run on the same machine, only download the data once.
+# replace AzureBatchCopier("inputfiles" with something more automatic, based on local files
 # When there is an error, say so, don't just return the result from the previous good run
 # Look at # https://azure.microsoft.com/en-us/documentation/articles/batch-parallel-node-tasks/
 # Can run multiple jobs at once and they don't clobber each other
