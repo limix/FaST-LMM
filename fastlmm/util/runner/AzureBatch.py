@@ -44,6 +44,9 @@ class AzureBatch: # implements IRunner
         JustCheckExists().input(distributable) #!!!cmk move input files
         batch_service_url, batch_account, batch_key, storage_account, storage_key = [s.strip() for s in open(os.path.expanduser("~")+"/azurebatch/cred.txt").xreadlines()] #!!!cmk make this a param????
 
+        container = "mapreduce" #!!!cmk make this an option
+        utils_version = 0        #!!!cmk make this an option
+
         ####################################################
         # Pickle the thing-to-run
         ####################################################
@@ -73,16 +76,16 @@ class AzureBatch: # implements IRunner
                 f.write(r"""set path=%AZ_BATCH_APP_PACKAGE_ANACONDA2%\Anaconda2;%AZ_BATCH_APP_PACKAGE_ANACONDA2%\Anaconda2\scripts\;%path%
 {6}mkdir ..\output\
 {6}cd ..\output\
-{6}python.exe ..\wd\blobxfer.py --delete --storageaccountkey {2} --download {3} output . --remoteresource .
+{6}python.exe ..\..\jobprep\wd\blobxfer.py --delete --storageaccountkey {2} --download {3} output . --remoteresource .
 {6}cd ..\wd\
 {7}
-python.exe blobxfer.py --skipskip --delete --storageaccountkey {2} --download {3} pp0 c:\user\tasks\workitems\pps\pp0 --remoteresource .
+python.exe ..\..\jobprep\wd\blobxfer.py --skipskip --delete --storageaccountkey {2} --download {3} pp0 c:\user\tasks\workitems\pps\pp0 --remoteresource .
 set pythonpath=c:\user\tasks\workitems\pps\pp0
 python.exe %AZ_BATCH_APP_PACKAGE_ANACONDA2%\Anaconda2\Lib\site-packages\fastlmm\util\distributable.py distributable.p LocalInParts(%1,{0},result_file=\"../output/result.p\",mkl_num_threads={1},temp_dir={4})
 {6}{8}
 cd ..\output\
-{5}python.exe ..\wd\blobxfer.py --storageaccountkey {2} --upload {3} output .
-{6}python.exe ..\wd\blobxfer.py --storageaccountkey {2} --upload {3} output result.p
+{5}python.exe ..\..\jobprep\wd\blobxfer.py --storageaccountkey {2} --upload {3} output .
+{6}python.exe ..\..\jobprep\wd\blobxfer.py --storageaccountkey {2} --upload {3} output result.p
                 """
                 .format(
                     self.taskcount,                         #0
@@ -103,7 +106,10 @@ cd ..\output\
         block_blob_client.create_container('application', fail_on_exist=False) #!!!cmk subfolders for each run
         distributablep_url = commonhelpers.upload_blob_and_create_sas(block_blob_client, 'application', "distributable.p", distributablep_filename, datetime.datetime.utcnow() + datetime.timedelta(hours=1))
         blobxfer_fn = os.path.join(os.path.dirname(__file__),"blobxfer.py")
-        blobxfer_url = commonhelpers.upload_blob_and_create_sas(block_blob_client, 'application', "blobxfer.py", blobxfer_fn, datetime.datetime.utcnow() + datetime.timedelta(hours=1))
+        block_blob_client.create_container(container, fail_on_exist=False)
+        blobxfer_blobfn = r"utils/{}/blobxfer.py".format(utils_version)
+        blobxfer_url = commonhelpers.upload_blob_and_create_sas(block_blob_client, container, blobxfer_blobfn, blobxfer_fn, datetime.datetime.utcnow() + datetime.timedelta(hours=1))
+        #blobxfer_url = commonhelpers.upload_blob_and_create_sas(block_blob_client, container, "blobxfer.py", blobxfer_fn, datetime.datetime.utcnow() + datetime.timedelta(hours=1))
         map_url = commonhelpers.upload_blob_and_create_sas(block_blob_client, 'application', "map.bat", os.path.join(run_dir_rel, "map.bat"), datetime.datetime.utcnow() + datetime.timedelta(hours=1))
         reduce_url = commonhelpers.upload_blob_and_create_sas(block_blob_client, 'application', "reduce.bat", os.path.join(run_dir_rel, "reduce.bat"), datetime.datetime.utcnow() + datetime.timedelta(hours=1))
 
@@ -139,22 +145,34 @@ $TargetDedicated = max({0},min($TargetVMs,{1}));
 // Set node deallocation mode - keep nodes active only until tasks finish
 $NodeDeallocationOption = taskcompletion;
 """.format(self.min_node_count,self.max_node_count)
-        #batch_client.pool.enable_auto_scale(
-        #        "twoa1",
-        #        auto_scale_formula=auto_scale_formula,
-        #        auto_scale_evaluation_interval=datetime.timedelta(minutes=10) 
-        #    )
+        batch_client.pool.enable_auto_scale(
+                "twoa1",
+                auto_scale_formula=auto_scale_formula,
+                auto_scale_evaluation_interval=datetime.timedelta(minutes=10) 
+            )
 
 
         ####################################################
         # Create a job with tasks and run it.
         ####################################################
         job_id = commonhelpers.generate_unique_resource_name(distributable.name)
-        job = batchmodels.JobAddParameter(id=job_id, pool_info=batch.models.PoolInformation(pool_id="twoa1"),uses_task_dependencies=True)
+
+        job_preparation_task = batchmodels.JobPreparationTask(
+                id="jobprep",
+                run_elevated=True,
+                resource_files=[batchmodels.ResourceFile(blob_source=blobxfer_url, file_path="blobxfer.py")],
+                command_line="cmd /c echo Job Prep",
+                )
+
+        job = batchmodels.JobAddParameter(
+            id=job_id,
+            job_preparation_task=job_preparation_task,
+            pool_info=batch.models.PoolInformation(pool_id="twoa1"),
+            uses_task_dependencies=True)
         batch_client.job.add(job)
 
-        resource_files=[batchmodels.ResourceFile(blob_source=distributablep_url, file_path="distributable.p"),
-                batchmodels.ResourceFile(blob_source=blobxfer_url, file_path="blobxfer.py"),
+        resource_files=[
+                batchmodels.ResourceFile(blob_source=distributablep_url, file_path="distributable.p"),
                 batchmodels.ResourceFile(blob_source=map_url, file_path="map.bat"),
                 batchmodels.ResourceFile(blob_source=reduce_url, file_path="reduce.bat"),
                 ]
@@ -251,7 +269,7 @@ class AzureBatchCopierNodeLocal(object): #Implements ICopier
     def input(self,item):
         if isinstance(item, str):
             itemnorm = "./"+os.path.normpath(item)
-            self.script_list[0] += r"python.exe ..\wd\blobxfer.py --storageaccountkey {} --download {} {} {} --remoteresource {}{}".format(self.storage_key,self.storage_account,self.container, ".", itemnorm, os.linesep)
+            self.script_list[0] += r"python.exe ..\..\jobprep\wd\blobxfer.py --storageaccountkey {} --download {} {} {} --remoteresource {}{}".format(self.storage_key,self.storage_account,self.container, ".", itemnorm, os.linesep)
         elif hasattr(item,"copyinputs"):
             item.copyinputs(self)
         # else -- do nothing
@@ -259,7 +277,7 @@ class AzureBatchCopierNodeLocal(object): #Implements ICopier
     def output(self,item):
         if isinstance(item, str):
             itemnorm = "./"+os.path.normpath(item)
-            self.script_list[1] += r"python.exe ..\wd\blobxfer.py --storageaccountkey {} --upload {} {} {} --remoteresource {}{}".format(self.storage_key,self.storage_account,self.container, ".", itemnorm, os.linesep)
+            self.script_list[1] += r"python.exe ..\..\jobprep\wd\blobxfer.py --storageaccountkey {} --upload {} {} {} --remoteresource {}{}".format(self.storage_key,self.storage_account,self.container, ".", itemnorm, os.linesep)
         elif hasattr(item,"copyoutputs"):
             item.copyoutputs(self)
         # else -- do nothing
@@ -402,21 +420,23 @@ if __name__ == "__main__":
         #runner = LocalMultiProc(2)
         test_fun(runner)
 
-# Copy input files to the machines
-# copy output files from the machine
-# make sure every use of storage: locally, in blobs, and on nodes, is sensable
+# Should shared inputfiles be in shared?
+# make sure every use of storage: locally, in blobs, and on nodes, is sensible
 # make sure that things stop when there is an error
 # If multiple jobs run on the same machine, only download the data once.
 # replace AzureBatchCopier("inputfiles" with something more automatic, based on local files
 # When there is an error, say so, don't just return the result from the previous good run
-# Look at # https://azure.microsoft.com/en-us/documentation/articles/batch-parallel-node-tasks/
 # Can run multiple jobs at once and they don't clobber each other
 # Copy 2+ python path to the machines
+# auto upload python zip file
+# Look at # https://azure.microsoft.com/en-us/documentation/articles/batch-parallel-node-tasks/
 # Understand HDFS and Azure storage
 # Stop using fastlmm2 for storage
 # control the default core limit so can have more than taskcount=99
 # is 'datetime.timedelta(minutes=25)' right?
 
+# DONE Copy input files to the machines
+# DONE copy output files from the machine
 # DONE Don't copy stdout stderr back
 # DONE instead of Datetime with no tzinfo will be considered UTC.
 #            Checking if all tasks are complete...
