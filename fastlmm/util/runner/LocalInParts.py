@@ -39,6 +39,7 @@ class LocalInParts: # implements IRunner
             tempdir = self.temp_dir
         else:
             tempdir = os.path.join(self.run_dir,distributable.tempdirectory)
+        tempdir = os.path.realpath(tempdir)
         if self.taskindex != self.taskcount:
             JustCheckExists().input(distributable)
             return run_one_task(distributable, self.taskindex, self.taskcount, tempdir)

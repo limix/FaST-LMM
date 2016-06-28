@@ -46,6 +46,8 @@ class AzureBatch: # implements IRunner
 
         container = "mapreduce" #!!!cmk make this an option
         utils_version = 0        #!!!cmk make this an option
+        pp_version = 0
+        data_version = 0
 
         ####################################################
         # Pickle the thing-to-run
@@ -59,59 +61,90 @@ class AzureBatch: # implements IRunner
         ####################################################
         # Copy (update) any input files to the blob and create scripts for running on the nodes
         ####################################################
-        inputOutputCopier = AzureBatchCopier("inputfiles",storage_key, storage_account)
+        data_blob_fn = "{0}-data-v{1}".format(container,data_version)
+        inputOutputCopier = AzureBatchCopier(data_blob_fn, storage_key, storage_account)
         inputOutputCopier.input(distributable)
 
         script_list = ["",""]
-        inputOutputCopier2 = AzureBatchCopierNodeLocal("inputfiles",storage_key, storage_account,script_list)
+        inputOutputCopier2 = AzureBatchCopierNodeLocal(data_blob_fn, container, data_version ,storage_key, storage_account,script_list)
         inputOutputCopier2.input(distributable)
         inputOutputCopier2.output(distributable)
 
         ####################################################
+        # Create the jobprep program
+        ####################################################
+        dist_filename = os.path.join(run_dir_rel, "jobprep.bat")
+        with open(dist_filename, mode='w') as f2:
+            f2.write(r"""set
+set path=%AZ_BATCH_APP_PACKAGE_ANACONDA2%\Anaconda2;%AZ_BATCH_APP_PACKAGE_ANACONDA2%\Anaconda2\scripts\;%path%
+python.exe %AZ_BATCH_TASK_WORKING_DIR%\blobxfer.py --skipskip --delete --storageaccountkey {2} --download {3} {4}-pp-v{5}-0 %AZ_BATCH_NODE_SHARED_DIR%\{4}\pp\v{5}\0 --remoteresource .
+{6}
+mkdir %AZ_BATCH_TASK_WORKING_DIR%\..\..\output
+            """
+            .format(
+                self.taskcount,                         #0
+                self.mkl_num_threads,                   #1
+                storage_key,                            #2 #!!!cmk use the URL instead of the key
+                storage_account,                        #3
+                container,                              #4
+                pp_version,                             #5
+                script_list[0],                         #6
+            ))#!!!cmk need multiple blobxfer lines
+
+
+        ####################################################
         # Create the batch program to run
         ####################################################
+        output_blobfn = "{}/output".format(run_dir_rel.replace("\\","/"))
         for i, bat_filename in enumerate(["map.bat","reduce.bat"]):
             dist_filename = os.path.join(run_dir_rel, bat_filename)
-            with open(dist_filename, mode='w') as f:
-                f.write(r"""set path=%AZ_BATCH_APP_PACKAGE_ANACONDA2%\Anaconda2;%AZ_BATCH_APP_PACKAGE_ANACONDA2%\Anaconda2\scripts\;%path%
-{6}mkdir ..\output\
-{6}cd ..\output\
-{6}python.exe ..\..\jobprep\wd\blobxfer.py --delete --storageaccountkey {2} --download {3} output . --remoteresource .
-{6}cd ..\wd\
-{7}
-python.exe ..\..\jobprep\wd\blobxfer.py --skipskip --delete --storageaccountkey {2} --download {3} pp0 c:\user\tasks\workitems\pps\pp0 --remoteresource .
-set pythonpath=c:\user\tasks\workitems\pps\pp0
-python.exe %AZ_BATCH_APP_PACKAGE_ANACONDA2%\Anaconda2\Lib\site-packages\fastlmm\util\distributable.py distributable.p LocalInParts(%1,{0},result_file=\"../output/result.p\",mkl_num_threads={1},temp_dir={4})
-{6}{8}
-cd ..\output\
-{5}python.exe ..\..\jobprep\wd\blobxfer.py --storageaccountkey {2} --upload {3} output .
-{6}python.exe ..\..\jobprep\wd\blobxfer.py --storageaccountkey {2} --upload {3} output result.p
+            with open(dist_filename, mode='w') as f1:
+                f1.write(r"""set path=%AZ_BATCH_APP_PACKAGE_ANACONDA2%\Anaconda2;%AZ_BATCH_APP_PACKAGE_ANACONDA2%\Anaconda2\scripts\;%path%
+{6}cd %AZ_BATCH_TASK_WORKING_DIR%\..\..\output
+{6}FOR /L %%i IN (0,1,{11}) DO python.exe %AZ_BATCH_JOB_PREP_WORKING_DIR%\blobxfer.py --storageaccountkey {2} --download {3} {8}/{10} . --remoteresource %%i.{0}.p
+cd %AZ_BATCH_NODE_SHARED_DIR%\{8}\data\v{9}
+set pythonpath=%AZ_BATCH_NODE_SHARED_DIR%\mapreduce\pp\v0\0
+python.exe %AZ_BATCH_APP_PACKAGE_ANACONDA2%\Anaconda2\Lib\site-packages\fastlmm\util\distributable.py %AZ_BATCH_JOB_PREP_WORKING_DIR%\distributable.p LocalInParts(%1,{0},result_file=r\"{4}/result.p\",mkl_num_threads={1},temp_dir=r\"{4}\")
+{6}{7}
+cd %AZ_BATCH_TASK_WORKING_DIR%\..\..\output
+{5}python.exe %AZ_BATCH_JOB_PREP_WORKING_DIR%\blobxfer.py --storageaccountkey {2} --upload {3} {8} %1.{0}.p --remoteresource {10}/%1.{0}.p
+{6}python.exe %AZ_BATCH_JOB_PREP_WORKING_DIR%\blobxfer.py --storageaccountkey {2} --upload {3} {8} result.p --remoteresource {10}/result.p
                 """
                 .format(
                     self.taskcount,                         #0
                     self.mkl_num_threads,                   #1
                     storage_key,                            #2 #!!!cmk use the URL instead of the key
                     storage_account,                        #3
-                    r'\"../output\"',                       #4
+                    "%AZ_BATCH_TASK_WORKING_DIR%/../../output", #4
                     "" if i==0 else "@rem ",                #5
                     "" if i==1 else "@rem ",                #6
-                    script_list[0],                         #7
-                    script_list[1],                         #8
+                    script_list[1],                         #7
+                    container,                              #8
+                    data_version,                           #9
+                    output_blobfn,                          #10
+                    self.taskcount-1,                       #11
                 ))#!!!cmk need multiple blobxfer lines
 
         ####################################################
         # Upload the thing-to-run to a blob and the blobxfer program
         ####################################################
         block_blob_client = azureblob.BlockBlobService(account_name=storage_account,account_key=storage_key)
-        block_blob_client.create_container('application', fail_on_exist=False) #!!!cmk subfolders for each run
-        distributablep_url = commonhelpers.upload_blob_and_create_sas(block_blob_client, 'application', "distributable.p", distributablep_filename, datetime.datetime.utcnow() + datetime.timedelta(hours=1))
-        blobxfer_fn = os.path.join(os.path.dirname(__file__),"blobxfer.py")
         block_blob_client.create_container(container, fail_on_exist=False)
-        blobxfer_blobfn = r"utils/{}/blobxfer.py".format(utils_version)
-        blobxfer_url = commonhelpers.upload_blob_and_create_sas(block_blob_client, container, blobxfer_blobfn, blobxfer_fn, datetime.datetime.utcnow() + datetime.timedelta(hours=1))
-        #blobxfer_url = commonhelpers.upload_blob_and_create_sas(block_blob_client, container, "blobxfer.py", blobxfer_fn, datetime.datetime.utcnow() + datetime.timedelta(hours=1))
-        map_url = commonhelpers.upload_blob_and_create_sas(block_blob_client, 'application', "map.bat", os.path.join(run_dir_rel, "map.bat"), datetime.datetime.utcnow() + datetime.timedelta(hours=1))
-        reduce_url = commonhelpers.upload_blob_and_create_sas(block_blob_client, 'application', "reduce.bat", os.path.join(run_dir_rel, "reduce.bat"), datetime.datetime.utcnow() + datetime.timedelta(hours=1))
+
+        distributablep_blobfn = "{}/distributable.p".format(run_dir_rel.replace("\\","/"))
+        distributablep_url = commonhelpers.upload_blob_and_create_sas(block_blob_client, container, distributablep_blobfn, distributablep_filename, datetime.datetime.utcnow() + datetime.timedelta(hours=1))
+
+        blobxfer_blobfn = "utils/v{}/blobxfer.py".format(utils_version)
+        blobxfer_url   = commonhelpers.upload_blob_and_create_sas(block_blob_client, container, blobxfer_blobfn, os.path.join(os.path.dirname(__file__),"blobxfer.py"), datetime.datetime.utcnow() + datetime.timedelta(hours=1))
+
+        jobprep_blobfn = "{}/jobprep.bat".format(run_dir_rel.replace("\\","/"))
+        jobprepbat_url = commonhelpers.upload_blob_and_create_sas(block_blob_client, container, jobprep_blobfn, os.path.join(run_dir_rel, "jobprep.bat"), datetime.datetime.utcnow() + datetime.timedelta(hours=1))
+
+        map_blobfn = "{}/map.bat".format(run_dir_rel.replace("\\","/"))
+        map_url = commonhelpers.upload_blob_and_create_sas(block_blob_client, container, map_blobfn, os.path.join(run_dir_rel, "map.bat"), datetime.datetime.utcnow() + datetime.timedelta(hours=1))
+
+        reduce_blobfn = "{}/reduce.bat".format(run_dir_rel.replace("\\","/"))
+        reduce_url = commonhelpers.upload_blob_and_create_sas(block_blob_client, container, reduce_blobfn, os.path.join(run_dir_rel, "reduce.bat"), datetime.datetime.utcnow() + datetime.timedelta(hours=1))
 
 
         ####################################################
@@ -120,7 +153,12 @@ cd ..\output\
         localpythonpath = os.environ.get("PYTHONPATH") #!!should it be able to work without pythonpath being set (e.g. if there was just one file)? Also, is None really the return or is it an exception.
         if localpythonpath == None: raise Exception("Expect local machine to have 'pythonpath' set")
         for i, localpathpart in enumerate(localpythonpath.split(';')):
-            blobxfer(r"blobxfer.py --skipskip --delete --storageaccountkey {} --upload {} {} {}".format(storage_key,storage_account,"pp{}".format(i),"."),
+            blobxfer(r"blobxfer.py --skipskip --delete --storageaccountkey {0} --upload {1} {2}-pp-v{3}-0 .".format(
+                            storage_key,                    #0
+                            storage_account,                #1
+                            container,                      #2
+                            pp_version,                     #3
+                            ),
                      wd=localpathpart)
     
 
@@ -132,36 +170,42 @@ cd ..\output\
         ####################################################
         credentials = batchauth.SharedKeyCredentials(batch_account, batch_key)
         batch_client = batch.BatchServiceClient(credentials,base_url=batch_service_url)
-        auto_scale_formula=r"""// Get pending tasks for the past 15 minutes.
-$Samples = $ActiveTasks.GetSamplePercent(TimeInterval_Minute * 15);
-// If we have fewer than 70 percent data points, we use the last sample point, otherwise we use the maximum of
-// last sample point and the history average.
-$Tasks = $Samples < 70 ? max(0,$ActiveTasks.GetSample(1)) : max( $ActiveTasks.GetSample(1), avg($ActiveTasks.GetSample(TimeInterval_Minute * 15)));
-// If number of pending tasks is not 0, set targetVM to pending tasks, otherwise half of current dedicated.
-$TargetVMs = $Tasks > 0? $Tasks:max(0, $TargetDedicated/2);
-// The pool size is capped at 20, if target VM value is more than that, set it to 20. This value
-// should be adjusted according to your use case.
-$TargetDedicated = max({0},min($TargetVMs,{1}));
-// Set node deallocation mode - keep nodes active only until tasks finish
-$NodeDeallocationOption = taskcompletion;
-""".format(self.min_node_count,self.max_node_count)
-        batch_client.pool.enable_auto_scale(
-                "twoa1",
-                auto_scale_formula=auto_scale_formula,
-                auto_scale_evaluation_interval=datetime.timedelta(minutes=10) 
-            )
+
+        if False: #!!!cmk turned off while debugging so can remote into VMs without them be taken away
+            auto_scale_formula=r"""// Get pending tasks for the past 15 minutes.
+    $Samples = $ActiveTasks.GetSamplePercent(TimeInterval_Minute * 15);
+    // If we have fewer than 70 percent data points, we use the last sample point, otherwise we use the maximum of
+    // last sample point and the history average.
+    $Tasks = $Samples < 70 ? max(0,$ActiveTasks.GetSample(1)) : max( $ActiveTasks.GetSample(1), avg($ActiveTasks.GetSample(TimeInterval_Minute * 15)));
+    // If number of pending tasks is not 0, set targetVM to pending tasks, otherwise half of current dedicated.
+    $TargetVMs = $Tasks > 0? $Tasks:max(0, $TargetDedicated/2);
+    // The pool size is capped at 20, if target VM value is more than that, set it to 20. This value
+    // should be adjusted according to your use case.
+    $TargetDedicated = max({0},min($TargetVMs,{1}));
+    // Set node deallocation mode - keep nodes active only until tasks finish
+    $NodeDeallocationOption = taskcompletion;
+    """.format(self.min_node_count,self.max_node_count)
+            batch_client.pool.enable_auto_scale(
+                    "twoa1",
+                    auto_scale_formula=auto_scale_formula,
+                    auto_scale_evaluation_interval=datetime.timedelta(minutes=10) 
+                )
 
 
         ####################################################
-        # Create a job with tasks and run it.
+        # Create a job with a job prep task
         ####################################################
         job_id = commonhelpers.generate_unique_resource_name(distributable.name)
 
         job_preparation_task = batchmodels.JobPreparationTask(
                 id="jobprep",
                 run_elevated=True,
-                resource_files=[batchmodels.ResourceFile(blob_source=blobxfer_url, file_path="blobxfer.py")],
-                command_line="cmd /c echo Job Prep",
+                resource_files=[
+                    batchmodels.ResourceFile(blob_source=blobxfer_url, file_path="blobxfer.py"),
+                    batchmodels.ResourceFile(blob_source=jobprepbat_url, file_path="jobprep.bat"),
+                    batchmodels.ResourceFile(blob_source=distributablep_url, file_path="distributable.p"),
+                    ],
+                command_line="jobprep.bat",
                 )
 
         job = batchmodels.JobAddParameter(
@@ -171,25 +215,23 @@ $NodeDeallocationOption = taskcompletion;
             uses_task_dependencies=True)
         batch_client.job.add(job)
 
-        resource_files=[
-                batchmodels.ResourceFile(blob_source=distributablep_url, file_path="distributable.p"),
-                batchmodels.ResourceFile(blob_source=map_url, file_path="map.bat"),
-                batchmodels.ResourceFile(blob_source=reduce_url, file_path="reduce.bat"),
-                ]
+        ####################################################
+        # Add regular tasks to the job and run it.
+        ####################################################
         task_list = []
         for taskindex in xrange(self.taskcount):
             map_task = batchmodels.TaskAddParameter(
                 id=str(taskindex),
                 run_elevated=True,
-                resource_files=resource_files,
-                command_line="map.bat {0}".format(taskindex),
+                resource_files=[batchmodels.ResourceFile(blob_source=map_url, file_path="map.bat")],
+                command_line=r"map.bat {0}".format(taskindex),
             )
             task_list.append(map_task)
         reduce_task = batchmodels.TaskAddParameter(
             id="reduce",
             run_elevated=True,
-            resource_files=resource_files,
-            command_line="reduce.bat {0}".format(self.taskcount),
+            resource_files=[batchmodels.ResourceFile(blob_source=reduce_url, file_path="reduce.bat")],
+            command_line=r"reduce.bat {0}".format(self.taskcount),
             depends_on = batchmodels.TaskDependencies(task_id_ranges=[batchmodels.TaskIdRange(0,self.taskcount-1)])
             )
         task_list.append(reduce_task)
@@ -225,59 +267,63 @@ $NodeDeallocationOption = taskcompletion;
         ####################################################
         # Download and Unpickle the result
         ####################################################
+        blobxfer(r"blobxfer.py --storageaccountkey {0} --download {1} {2}/{3} . --remoteresource result.p".format(storage_key,storage_account,container,output_blobfn), wd=run_dir_rel)
         resultp_filename = os.path.join(run_dir_rel, "result.p")
-        blobxfer(r"blobxfer.py --storageaccountkey {} --download {} output . --remoteresource result.p".format(storage_key,storage_account), wd=run_dir_rel)
         with open(resultp_filename, mode='rb') as f:
             result = pickle.load(f)
         return result
 
 class AzureBatchCopier(object): #Implements ICopier
 
-    def __init__(self, container, storage_key, storage_account):
-        self.container = container
+    def __init__(self, blob_fn, storage_key, storage_account):
+        self.blob_fn = blob_fn
         self.storage_key=storage_key
         self.storage_account=storage_account
 
     def input(self,item):
         if isinstance(item, str):
-            itemnorm = "./"+os.path.normpath(item)
-            blobxfer(r"blobxfer.py --skipskip --storageaccountkey {} --upload {} {} {}".format(self.storage_key,self.storage_account,self.container,itemnorm),wd=".")
+            itemnorm = "./"+os.path.normpath(item).replace("\\","/")
+            blobxfer(r"blobxfer.py --skipskip --storageaccountkey {} --upload {} {} {}".format(self.storage_key,self.storage_account,self.blob_fn,itemnorm),wd=".")
         elif hasattr(item,"copyinputs"):
             item.copyinputs(self)
         # else -- do nothing
 
     def output(self,item):
         if isinstance(item, str):
-            itemnorm = "./"+os.path.normpath(item)
-            blobxfer(r"blobxfer.py --skipskip --storageaccountkey {} --download {} {} {} --remoteresource {}".format(self.storage_key,self.storage_account,self.container, ".", itemnorm), wd=".")
-            print "test!!!cmk"
+            itemnorm = "./"+os.path.normpath(item).replace("\\","/")
+            blobxfer(r"blobxfer.py --skipskip --storageaccountkey {} --download {} {} {} --remoteresource {}".format(self.storage_key,self.storage_account,self.blob_fn, ".", itemnorm), wd=".")
         elif hasattr(item,"copyoutputs"):
             item.copyoutputs(self)
         # else -- do nothing
 
 class AzureBatchCopierNodeLocal(object): #Implements ICopier
 
-    def __init__(self, container, storage_key, storage_account, script_list):
+    def __init__(self, datablob_fn, container, data_version, storage_key, storage_account, script_list):
         assert len(script_list) == 2, "expect script list to be a list of length two"
         script_list[0] = ""
         script_list[1] = ""
+        self.datablob_fn = datablob_fn
         self.container = container
+        self.data_version = data_version
         self.storage_key=storage_key
         self.storage_account=storage_account
         self.script_list = script_list
 
     def input(self,item):
         if isinstance(item, str):
-            itemnorm = "./"+os.path.normpath(item)
-            self.script_list[0] += r"python.exe ..\..\jobprep\wd\blobxfer.py --storageaccountkey {} --download {} {} {} --remoteresource {}{}".format(self.storage_key,self.storage_account,self.container, ".", itemnorm, os.linesep)
+            itemnorm = "./"+os.path.normpath(item).replace("\\","/")
+            node_folder = r"%AZ_BATCH_NODE_SHARED_DIR%\{0}\data\v{1}".format(self.container,self.data_version)
+            self.script_list[0] += r"mkdir {0}{1}".format(node_folder,os.linesep)
+            self.script_list[0] += r"cd {0}{1}".format(node_folder,os.linesep)
+            self.script_list[0] += r"python.exe %AZ_BATCH_TASK_WORKING_DIR%\blobxfer.py --storageaccountkey {} --download {} {} {} --remoteresource {}{}".format(self.storage_key,self.storage_account,self.datablob_fn, ".", itemnorm, os.linesep)
         elif hasattr(item,"copyinputs"):
             item.copyinputs(self)
         # else -- do nothing
 
     def output(self,item):
         if isinstance(item, str):
-            itemnorm = "./"+os.path.normpath(item)
-            self.script_list[1] += r"python.exe ..\..\jobprep\wd\blobxfer.py --storageaccountkey {} --upload {} {} {} --remoteresource {}{}".format(self.storage_key,self.storage_account,self.container, ".", itemnorm, os.linesep)
+            itemnorm = "./"+os.path.normpath(item).replace("\\","/")
+            self.script_list[1] += r"python.exe %AZ_BATCH_JOB_PREP_WORKING_DIR%\blobxfer.py --storageaccountkey {} --upload {} {} {} --remoteresource {}{}".format(self.storage_key,self.storage_account,self.datablob_fn, ".", itemnorm, os.linesep)
         elif hasattr(item,"copyoutputs"):
             item.copyoutputs(self)
         # else -- do nothing
@@ -299,7 +345,7 @@ def test_fun(runner):
         shutil.copy2('data/del3/text.txt', 'data/del3/text2.txt')
         return list(sequence)
 
-    result = map_reduce(range(1000),
+    result = map_reduce(range(15),
                         mapper=printx,
                         reducer=reducerx,
                         name="printx",
@@ -420,6 +466,8 @@ if __name__ == "__main__":
         #runner = LocalMultiProc(2)
         test_fun(runner)
 
+
+# Remove C:\user\tasks\ from code and use an enviornment variable instead
 # Should shared inputfiles be in shared?
 # make sure every use of storage: locally, in blobs, and on nodes, is sensible
 # make sure that things stop when there is an error
@@ -434,6 +482,8 @@ if __name__ == "__main__":
 # Stop using fastlmm2 for storage
 # control the default core limit so can have more than taskcount=99
 # is 'datetime.timedelta(minutes=25)' right?
+
+# DONE:
 
 # DONE Copy input files to the machines
 # DONE copy output files from the machine
