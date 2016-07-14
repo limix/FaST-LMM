@@ -306,3 +306,11 @@ tests/temp_test/0.1.p
 tests/temp_test/0.20.p
 tests/tmp_extract.txt
 tests/tmp_extract_sim.txt
+/fastlmm/association/temp_test
+/dist
+/fastlmm/association/FastLmmSetLOOC.py.orig
+/fastlmm/.vs/config/applicationhost.config
+*.pyperf
+/tests/datasets/synth/chrNot1.bed
+/tests/datasets/synth/chrNot1.bim
+/tests/datasets/synth/chrNot1.fam

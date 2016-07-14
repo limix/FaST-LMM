@@ -12,7 +12,7 @@ interface IRunner
 
 '''
 import os
-import cPickle as pickle
+import cPickle as cPickle
 import fastlmm.util.util as util
 from itertools import *
 
@@ -94,16 +94,16 @@ def doMainWorkForOneIndex(distributable, taskAndWorkcount, taskindex, workdirect
                 assert is_first_and_only, "real assert"
                 is_first_and_only = False
                 result = run_all_in_memory(work)
-                pickle.dump(result, f, pickle.HIGHEST_PROTOCOL) # save a result to the temp results file
+                cPickle.dump(result, f, cPickle.HIGHEST_PROTOCOL) # save a result to the temp results file
         else:
             for workIndex, work in enumerate(distributable.work_sequence()):
                 if workIndex == taskAndWorkcount : raise Exception("Expect len(work_sequence) to match work_count, but work_sequence was too long")
                 if workIndex == taskindex :
                     result = run_all_in_memory(work)
-                    pickle.dump(result, f, pickle.HIGHEST_PROTOCOL) # save a result to the temp results file
+                    cPickle.dump(result, f, cPickle.HIGHEST_PROTOCOL) # save a result to the temp results file
                     workDone = True
                     if workIndex != taskAndWorkcount-1  : #the work is done, so quit enumerating work (but don't quit early if you're the last workIndex because we want to double check that the work_sequence and work_count match up)
-                            break
+                        break
             if not workDone : raise Exception("Expect len(work_sequence) to match work_count, but work_sequence was too short")
 
 def work_sequence_from_disk(workdirectory, taskAndWorkcount):
@@ -114,7 +114,7 @@ def work_sequence_from_disk(workdirectory, taskAndWorkcount):
         task_file_name = create_task_file_name(workdirectory, taskindex, taskAndWorkcount)
         with open(task_file_name, mode='rb') as f:
             try:
-                result = pickle.load(f)
+                result = cPickle.load(f)
             except Exception, detail:
                 raise Exception("Error trying to unpickle '{0}'. {1}".format(task_file_name,detail))
         if True: #!!!cmk0 taskindex % 100 == 0:
@@ -418,3 +418,4 @@ from .Hadoop2 import *
 from .LocalMapper import *
 from .LocalReducer import *
 from .localfromranges import *
+from .AzureBatch import *

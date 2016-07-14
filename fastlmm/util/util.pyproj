@@ -6,7 +6,7 @@
     <ProjectGuid>{9144f8b5-632b-4a72-bd8e-01d453affb5a}</ProjectGuid>
     <ProjectHome>.</ProjectHome>
     <StartupFile>runner\AzureBatch.py</StartupFile>
-    <SearchPath>c:\source\carlk\fastlmm</SearchPath>
+    <SearchPath>c:\source\carlk\fastlmm;c:\source\carlk\pysnptools</SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
     <OutputPath>.</OutputPath>
     <Name>util</Name>

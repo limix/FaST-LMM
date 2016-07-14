@@ -1,6 +1,5 @@
 import logging
 import datetime
-import fastlmm.util.runner.azurehelper as commonhelpers #!!!cmk is this the best way to include the code from the Azure python sample's common.helper.py?
 import os
 import time
 import pysnptools.util as pstutil
@@ -14,18 +13,22 @@ except:
     import cPickle as pickle
 
 try:
-    import azure.batch.batch_service_client as batch 
-    import azure.batch.batch_auth as batchauth 
     import azure.batch.models as batchmodels
     import azure.storage.blob as azureblob
+    azure_ok = True
+except Exception, exception:
+    logging.warning("Can't import azure, so won't be able to clusterize to azure")
+    azure_ok = False
+
+if azure_ok:
+    import azurehelper as commonhelpers #!!!cmk is this the best way to include the code from the Azure python sample's common.helper.py?
+    import azure.batch.batch_service_client as batch 
+    import azure.batch.batch_auth as batchauth 
     from fastlmm.util.runner.blobxfer import run_command_string as blobxfer #https://pypi.io/project/blobxfer/
 
-except Exception as exp:
-    logging.warning(exp)
-    pass
-
 class AzureBatch: # implements IRunner
-    def __init__(self, task_count, min_node_count, max_node_count, mkl_num_threads = None, logging_handler=logging.StreamHandler(sys.stdout)):
+    def __init__(self, task_count, min_node_count, max_node_count, pool_id, mkl_num_threads = None,
+                 logging_handler=logging.StreamHandler(sys.stdout)):
         logger = logging.getLogger() #!!!cmk similar code elsewhere
         if not logger.handlers:
             logger.setLevel(logging.INFO)
@@ -39,6 +42,7 @@ class AzureBatch: # implements IRunner
         self.min_node_count = min_node_count
         self.max_node_count = max_node_count
         self.mkl_num_threads = mkl_num_threads
+        self.pool_id = pool_id
 
     def run(self, distributable):
         JustCheckExists().input(distributable) #!!!cmk move input files
@@ -73,11 +77,12 @@ class AzureBatch: # implements IRunner
         ####################################################
         # Create the jobprep program
         ####################################################
+        localpythonpath = os.environ.get("PYTHONPATH") #!!should it be able to work without pythonpath being set (e.g. if there was just one file)? Also, is None really the return or is it an exception.
         dist_filename = os.path.join(run_dir_rel, "jobprep.bat")
         with open(dist_filename, mode='w') as f2:
             f2.write(r"""set
 set path=%AZ_BATCH_APP_PACKAGE_ANACONDA2%\Anaconda2;%AZ_BATCH_APP_PACKAGE_ANACONDA2%\Anaconda2\scripts\;%path%
-python.exe %AZ_BATCH_TASK_WORKING_DIR%\blobxfer.py --skipskip --delete --storageaccountkey {2} --download {3} {4}-pp-v{5}-0 %AZ_BATCH_NODE_SHARED_DIR%\{4}\pp\v{5}\0 --remoteresource .
+FOR /L %%i IN (0,1,{7}) DO python.exe %AZ_BATCH_TASK_WORKING_DIR%\blobxfer.py --skipskip --delete --storageaccountkey {2} --download {3} {4}-pp-v{5}-%%i %AZ_BATCH_NODE_SHARED_DIR%\{4}\pp\v{5}\%%i --remoteresource .
 {6}
 mkdir %AZ_BATCH_TASK_WORKING_DIR%\..\..\output
             """
@@ -89,6 +94,7 @@ mkdir %AZ_BATCH_TASK_WORKING_DIR%\..\..\output
                 container,                              #4
                 pp_version,                             #5
                 script_list[0],                         #6
+                len(localpythonpath.split(';'))-1,      #7
             ))#!!!cmk need multiple blobxfer lines
 
 
@@ -150,14 +156,14 @@ cd %AZ_BATCH_TASK_WORKING_DIR%\..\..\output
         ####################################################
         # Copy everything on PYTHONPATH to a blob
         ####################################################
-        localpythonpath = os.environ.get("PYTHONPATH") #!!should it be able to work without pythonpath being set (e.g. if there was just one file)? Also, is None really the return or is it an exception.
         if localpythonpath == None: raise Exception("Expect local machine to have 'pythonpath' set")
         for i, localpathpart in enumerate(localpythonpath.split(';')):
-            blobxfer(r"blobxfer.py --skipskip --delete --storageaccountkey {0} --upload {1} {2}-pp-v{3}-0 .".format(
+            blobxfer(r"blobxfer.py --skipskip --delete --storageaccountkey {0} --upload {1} {2}-pp-v{3}-{4} .".format(
                             storage_key,                    #0
                             storage_account,                #1
                             container,                      #2
                             pp_version,                     #3
+                            i,                              #4
                             ),
                      wd=localpathpart)
     
@@ -170,6 +176,8 @@ cd %AZ_BATCH_TASK_WORKING_DIR%\..\..\output
         ####################################################
         credentials = batchauth.SharedKeyCredentials(batch_account, batch_key)
         batch_client = batch.BatchServiceClient(credentials,base_url=batch_service_url)
+
+        #!!!cmk document that maxTasksPerNode and packing policy are per-pool and setting the values will over ride previous values
 
         if False: #!!!cmk turned off while debugging so can remote into VMs without them be taken away
             auto_scale_formula=r"""// Get pending tasks for the past 15 minutes.
@@ -186,16 +194,15 @@ cd %AZ_BATCH_TASK_WORKING_DIR%\..\..\output
     $NodeDeallocationOption = taskcompletion;
     """.format(self.min_node_count,self.max_node_count)
             batch_client.pool.enable_auto_scale(
-                    "twoa1",
+                    self.pool_id,
                     auto_scale_formula=auto_scale_formula,
                     auto_scale_evaluation_interval=datetime.timedelta(minutes=10) 
                 )
 
-
         ####################################################
         # Create a job with a job prep task
         ####################################################
-        job_id = commonhelpers.generate_unique_resource_name(distributable.name)
+        job_id = commonhelpers.generate_unique_resource_name(distributable.tempdirectory.replace("_","-")) #!!!cmk is the replace needed? Is it enough?
 
         job_preparation_task = batchmodels.JobPreparationTask(
                 id="jobprep",
@@ -211,7 +218,7 @@ cd %AZ_BATCH_TASK_WORKING_DIR%\..\..\output
         job = batchmodels.JobAddParameter(
             id=job_id,
             job_preparation_task=job_preparation_task,
-            pool_info=batch.models.PoolInformation(pool_id="twoa1"),
+            pool_info=batch.models.PoolInformation(pool_id=self.pool_id),
             uses_task_dependencies=True)
         batch_client.job.add(job)
 
@@ -424,7 +431,7 @@ if __name__ == "__main__":
 
         batch_client = batch.BatchServiceClient(credentials,base_url=batch_service_url)
 
-        job = batchmodels.JobAddParameter(id=job_id, pool_info=batch.models.PoolInformation(pool_id="twoa1"))
+        job = batchmodels.JobAddParameter(id=job_id, pool_info=batch.models.PoolInformation(pool_id=self.poold_id))
         batch_client.job.add(job)
 
        # see http://azure-sdk-for-python.readthedocs.io/en/latest/ref/azure.batch.html
@@ -462,28 +469,30 @@ if __name__ == "__main__":
         from fastlmm.util.runner.AzureBatch import test_fun
         from fastlmm.util.runner import Local, HPC, LocalMultiProc
 
-        runner = AzureBatch(task_count=20,min_node_count=2,max_node_count=7) #!!!cmk there is a default core limit of 99
+        runner = AzureBatch(task_count=20,min_node_count=2,max_node_count=7,pool_id="twoa2x2") #!!!cmk there is a default core limit of 99
         #runner = LocalMultiProc(2)
         test_fun(runner)
 
 
-# Remove C:\user\tasks\ from code and use an enviornment variable instead
-# Should shared inputfiles be in shared?
-# make sure every use of storage: locally, in blobs, and on nodes, is sensible
-# make sure that things stop when there is an error
-# If multiple jobs run on the same machine, only download the data once.
-# replace AzureBatchCopier("inputfiles" with something more automatic, based on local files
 # When there is an error, say so, don't just return the result from the previous good run
-# Can run multiple jobs at once and they don't clobber each other
 # Copy 2+ python path to the machines
-# auto upload python zip file
-# Look at # https://azure.microsoft.com/en-us/documentation/articles/batch-parallel-node-tasks/
+# Auto config
+#   auto upload python zip file
+#   create pool for scratch or use an existing one
+# make version and "mapreduce" a param
 # Understand HDFS and Azure storage
-# Stop using fastlmm2 for storage
 # control the default core limit so can have more than taskcount=99
+# Need share access Pool if want nodes to talk to each other?
 # is 'datetime.timedelta(minutes=25)' right?
 
 # DONE:
+# Stop using fastlmm2 for storage
+# Can run multiple jobs at once and they don't clobber each other
+# Remove C:\user\tasks\ from code and use an enviornment variable instead
+# Should shared inputfiles be in shared?
+# make sure every use of storage: locally, in blobs, and on nodes, is sensible
+# If multiple jobs run on the same machine, only download the data once.
+# replace AzureBatchCopier("inputfiles" with something more automatic, based on local files
 
 # DONE Copy input files to the machines
 # DONE copy output files from the machine

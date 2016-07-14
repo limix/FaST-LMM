@@ -29,6 +29,7 @@ from pysnptools.util.intrangeset import IntRangeSet
 from fastlmm.inference.fastlmm_predictor import _snps_fixup, _pheno_fixup, _kernel_fixup, _SnpTrainTest
 import fastlmm.inference.linear_regression as lin_reg
 
+#!!!cmk add documentation here and anywhere else that output_file_name is CSV format with tab delimiters
 def single_snp(test_snps, pheno, K0=None,
                  K1=None, mixing=None,
                  covar=None, covar_by_chrom=None, leave_out_one_chrom=True, output_file_name=None, h2=None, log_delta=None,

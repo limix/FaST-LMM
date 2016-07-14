@@ -23,12 +23,18 @@ class DistributableTest(object) : #implements IDistributable
 
     def do_work(self, test):
 
-        #test_result = unittest.TestResult()
+        ###############test_result = unittest.TestResult()
         r = unittest.TextTestRunner(failfast=False)
+        logging.info(test)
+        logging.info("!!!cmk z0")
         test.setUpClass()
+        logging.info("!!!cmk z")
         test_result = r.run(test)
-        #test.run(result=test_result)
+        ##############test.run(result=test_result)
         test.tearDownClass()
+        #!!!cmktest_result._original_stdout = None
+        ##!!!cmktest_result._original_stderr = None
+        ##!!!cmktest_result.stream = None
         return test_result
 
  #start of IDistributable interface--------------------------------------
@@ -44,7 +50,7 @@ class DistributableTest(object) : #implements IDistributable
 
 
     def work_sequence(self):
-        for test in self.deep_iter(self._test_or_suite):
+        for i, test in enumerate(self.deep_iter(self._test_or_suite)):
             yield lambda test=test : self.do_work(test)  # the 'test=test' is need to get around a strangeness in Python
 
     def reduce(self, result_sequence):
