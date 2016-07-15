@@ -314,3 +314,5 @@ tests/tmp_extract_sim.txt
 /tests/datasets/synth/chrNot1.bed
 /tests/datasets/synth/chrNot1.bim
 /tests/datasets/synth/chrNot1.fam
+/fastlmm/fastlmm.VC.VC.opendb
+/fastlmm/fastlmm.VC.db

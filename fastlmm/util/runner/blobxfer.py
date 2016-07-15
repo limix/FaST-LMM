@@ -1630,6 +1630,9 @@ def get_blob_listing(blob_service, args, metadata=True):
         except azure.common.AzureMissingResourceHttpError:
             break
         for blob in result:
+            if blob.name.endswith("Bed.py"): #!!!cmk debug
+                print("!!!cmk")
+
             blobdict[blob.name] = [
                 blob.properties.content_length,
                 blob.properties.content_settings.content_md5, None]
@@ -2357,6 +2360,10 @@ def main(exit_is_ok=True):
                         if args.include is not None and not fnmatch.fnmatch(
                                 fname, args.include):
                             continue
+                        if fname.endswith("VC.opendb"): #!!!cmk make some .ignore-like option
+                            continue
+                        if fname.endswith("Bed.py"): #!!!cmk make some .ignore-like option
+                            print("!!!cmk")
                         remotefname = apply_file_collation_and_strip(
                             args, fname)
                         _remotefiles.add(remotefname)

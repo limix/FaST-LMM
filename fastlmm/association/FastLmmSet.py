@@ -812,13 +812,14 @@ class FastLmmSet: # implements IDistributable
             if (not os.path.exists('select')):
                 subprocess.call("mkdir select", shell=True)
 
-            with TemporaryFile() as stdout_temp:
-                if (self.covarfile == None):
-                    subprocess.call(fastlmmpath + ' -autoselect select/auto -bfilesim ' + root + ' -pheno ' + self.phenofile + ' -pedOutFile ' + "select/null", shell=True, stdout=stdout_temp, stderr=subprocess.STDOUT)
-                else:
-                    subprocess.call(fastlmmpath + ' -autoselect select/auto -bfilesim ' + root + ' -pheno ' + self.phenofile + ' -covar ' + self.covarfile + ' -pedOutFile ' + "select/null", shell=True, stdout=stdout_temp, stderr=subprocess.STDOUT)
-                stdout_temp.seek(0)
-                stdout_string = stdout_temp.read()
+            with TemporaryFile() as stdin_temp: #An empty to file from which to read stdin (This allows this to run even when there is no normal stdin defined)
+                with TemporaryFile() as stdout_temp:
+                    if (self.covarfile == None):
+                        subprocess.call(fastlmmpath + ' -autoselect select/auto -bfilesim ' + root + ' -pheno ' + self.phenofile + ' -pedOutFile ' + "select/null", shell=True, stdout=stdout_temp, stderr=subprocess.STDOUT, stdin=stdin_temp)
+                    else:
+                        subprocess.call(fastlmmpath + ' -autoselect select/auto -bfilesim ' + root + ' -pheno ' + self.phenofile + ' -covar ' + self.covarfile + ' -pedOutFile ' + "select/null", shell=True, stdout=stdout_temp, stderr=subprocess.STDOUT, stdin=stdin_temp)
+                    stdout_temp.seek(0)
+                    stdout_string = stdout_temp.read()
             logging.info(stdout_string)
 
             self.__SNPs0 = {

@@ -210,13 +210,13 @@ if __name__ == '__main__':
 
 
         #runner = Local()
-        #runner = LocalMultiProc(taskcount=1,mkl_num_threads=5,just_one_process=True)
+        #runner = LocalMultiProc(taskcount=1,mkl_num_threads=5,just_one_process=False)
         #runner = LocalInParts(1,2,mkl_num_threads=1) # For debugging the cluster runs
         #runner = Hadoop2(100, mapmemory=8*1024, reducememory=8*1024, mkl_num_threads=1, queue="default")
-        runner = AzureBatch(task_count=74,min_node_count=2,max_node_count=7,pool_id="twoa2x2")
+        #runner = AzureBatch(task_count=74,min_node_count=2,max_node_count=7,pool_id="twoa2x2")
         #!!!cmk also if task_count for AzureBatch is > 99, it fails with an error message that is hard to understand.
 
-        #runner = AzureBatch(task_count=10,min_node_count=2,max_node_count=7,pool_id="twoa2x2")
+        runner = AzureBatch(task_count=75,min_node_count=2,max_node_count=7,pool_id="twoa2x2")
         distributable_test = DistributableTest(suites_cmk,"temp_test")
         print runner.run(distributable_test)
 

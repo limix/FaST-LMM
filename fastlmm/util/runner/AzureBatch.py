@@ -48,10 +48,10 @@ class AzureBatch: # implements IRunner
         JustCheckExists().input(distributable) #!!!cmk move input files
         batch_service_url, batch_account, batch_key, storage_account, storage_key = [s.strip() for s in open(os.path.expanduser("~")+"/azurebatch/cred.txt").xreadlines()] #!!!cmk make this a param????
 
-        container = "mapreduce" #!!!cmk make this an option
-        utils_version = 0        #!!!cmk make this an option
-        pp_version = 0
-        data_version = 0
+        container = "mapreduce3" #!!!cmk make this an option
+        utils_version = 3        #!!!cmk make this an option
+        pp_version = 3        #!!!cmk make this an option
+        data_version = 3        #!!!cmk make this an option
 
         ####################################################
         # Pickle the thing-to-run
@@ -70,7 +70,7 @@ class AzureBatch: # implements IRunner
         inputOutputCopier.input(distributable)
 
         script_list = ["",""]
-        inputOutputCopier2 = AzureBatchCopierNodeLocal(data_blob_fn, container, data_version ,storage_key, storage_account,script_list)
+        inputOutputCopier2 = AzureBatchCopierNodeLocal(data_blob_fn, container, data_version ,storage_key, storage_account, script_list)
         inputOutputCopier2.input(distributable)
         inputOutputCopier2.output(distributable)
 
@@ -102,6 +102,7 @@ mkdir %AZ_BATCH_TASK_WORKING_DIR%\..\..\output
         # Create the batch program to run
         ####################################################
         output_blobfn = "{}/output".format(run_dir_rel.replace("\\","/"))
+        pythonpath_string = "set pythonpath=" + ";".join(r"%AZ_BATCH_NODE_SHARED_DIR%\{0}\pp\v{1}\{2}".format(container,pp_version,i) for i in xrange(len(localpythonpath.split(';'))))
         for i, bat_filename in enumerate(["map.bat","reduce.bat"]):
             dist_filename = os.path.join(run_dir_rel, bat_filename)
             with open(dist_filename, mode='w') as f1:
@@ -109,7 +110,7 @@ mkdir %AZ_BATCH_TASK_WORKING_DIR%\..\..\output
 {6}cd %AZ_BATCH_TASK_WORKING_DIR%\..\..\output
 {6}FOR /L %%i IN (0,1,{11}) DO python.exe %AZ_BATCH_JOB_PREP_WORKING_DIR%\blobxfer.py --storageaccountkey {2} --download {3} {8}/{10} . --remoteresource %%i.{0}.p
 cd %AZ_BATCH_NODE_SHARED_DIR%\{8}\data\v{9}
-set pythonpath=%AZ_BATCH_NODE_SHARED_DIR%\mapreduce\pp\v0\0
+{13}
 python.exe %AZ_BATCH_APP_PACKAGE_ANACONDA2%\Anaconda2\Lib\site-packages\fastlmm\util\distributable.py %AZ_BATCH_JOB_PREP_WORKING_DIR%\distributable.p LocalInParts(%1,{0},result_file=r\"{4}/result.p\",mkl_num_threads={1},temp_dir=r\"{4}\")
 {6}{7}
 cd %AZ_BATCH_TASK_WORKING_DIR%\..\..\output
@@ -129,6 +130,8 @@ cd %AZ_BATCH_TASK_WORKING_DIR%\..\..\output
                     data_version,                           #9
                     output_blobfn,                          #10
                     self.taskcount-1,                       #11
+                    pp_version,                             #12
+                    pythonpath_string                       #13
                 ))#!!!cmk need multiple blobxfer lines
 
         ####################################################
@@ -179,7 +182,7 @@ cd %AZ_BATCH_TASK_WORKING_DIR%\..\..\output
 
         #!!!cmk document that maxTasksPerNode and packing policy are per-pool and setting the values will over ride previous values
 
-        if False: #!!!cmk turned off while debugging so can remote into VMs without them be taken away
+        if True: #!!!cmk turned off while debugging so can remote into VMs without them be taken away
             auto_scale_formula=r"""// Get pending tasks for the past 15 minutes.
     $Samples = $ActiveTasks.GetSamplePercent(TimeInterval_Minute * 15);
     // If we have fewer than 70 percent data points, we use the last sample point, otherwise we use the maximum of
@@ -315,13 +318,13 @@ class AzureBatchCopierNodeLocal(object): #Implements ICopier
         self.storage_key=storage_key
         self.storage_account=storage_account
         self.script_list = script_list
+        self.node_folder = r"%AZ_BATCH_NODE_SHARED_DIR%\{0}\data\v{1}".format(self.container,self.data_version)
+        self.script_list[0] += r"mkdir {0}{1}".format(self.node_folder,os.linesep)
 
     def input(self,item):
         if isinstance(item, str):
             itemnorm = "./"+os.path.normpath(item).replace("\\","/")
-            node_folder = r"%AZ_BATCH_NODE_SHARED_DIR%\{0}\data\v{1}".format(self.container,self.data_version)
-            self.script_list[0] += r"mkdir {0}{1}".format(node_folder,os.linesep)
-            self.script_list[0] += r"cd {0}{1}".format(node_folder,os.linesep)
+            self.script_list[0] += r"cd {0}{1}".format(self.node_folder,os.linesep)
             self.script_list[0] += r"python.exe %AZ_BATCH_TASK_WORKING_DIR%\blobxfer.py --storageaccountkey {} --download {} {} {} --remoteresource {}{}".format(self.storage_key,self.storage_account,self.datablob_fn, ".", itemnorm, os.linesep)
         elif hasattr(item,"copyinputs"):
             item.copyinputs(self)
