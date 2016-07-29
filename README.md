@@ -12,6 +12,7 @@ Our documentation (including live examples) is also available as ipython noteboo
 Additionally, API documentation is available:
 http://research.microsoft.com/en-us/um/redmond/projects/MSCompBio/Fastlmm/api/
 
+A C++ version, which is generally less functional, is available at http://research.microsoft.com/en-us/downloads/30260656-0f99-4ae0-b7ce-08157b50d4d9/
 
 ### Quick install:
 

@@ -35,7 +35,7 @@ import pysnptools.util
 import pysnptools.util.pheno
 import time
 import fastlmm.inference.lmm_cov as lmm_cov
-
+import glob
 
 def create_dir(filename, is_dir=True):
     if is_dir:
@@ -159,6 +159,7 @@ class GWAS(object):
         beta = res['beta']
             
         chi2stats = beta*beta/res['variance_beta']
+
         #p_values = st.chi2.sf(chi2stats,1)[:,0]
         #!!!cmk should 3 really be hardcoded here?
         p_values = st.f.sf(chi2stats,1,self.lmm.U.shape[0]-3)[:,0]#note that G.shape is the number of individuals and 3 is the number of fixed effects (covariates+SNP)
@@ -227,6 +228,20 @@ class GWAS(object):
             return ret
 
         return pheno_input
+
+    @staticmethod
+    def load_results(dir_name,pheno_name):
+        result = None
+        mydir = dir_name + "/" + pheno_name + "/"
+        myfile_pattern = "%s%s_block_*.csv" % (mydir, pheno_name)
+        files = glob.glob(myfile_pattern)
+        for filename in files:
+            res = pd.read_csv(filename)
+            if result is None:
+                result = res
+            else:
+                result = pd.concat((result,res),0)
+        return result
 
 if __name__ == "__main__":
 

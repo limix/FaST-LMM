@@ -2,7 +2,7 @@ import scipy as SP
 import scipy.optimize as opt
 
 
-def minimize1D(f, evalgrid = None, nGrid=10, minval=0.0, maxval = 0.99999, verbose=False, brent=True,check_boundaries = True, resultgrid=None):
+def minimize1D(f, evalgrid = None, nGrid=10, minval=0.0, maxval = 0.99999, verbose=False, brent=True,check_boundaries = True, resultgrid=None, return_grid=False):
     '''
     minimize a function f(x) in the grid between minval and maxval.
     The function will be evaluated on a grid and then all triplets,
@@ -59,7 +59,10 @@ def minimize1D(f, evalgrid = None, nGrid=10, minval=0.0, maxval = 0.99999, verbo
                 if minlocal[1]<minglobal[1]:
                     minglobal=minlocal[0:2]
                     if verbose: print "found new minimum from brent search"
-    return minglobal
+    if return_grid:
+        return (minglobal[0], minglobal[1], evalgrid, resultgrid)
+    else:
+        return minglobal
 
 
 def evalgrid1D(f, evalgrid = None, nGrid=10, minval=0.0, maxval = 0.99999, dimF=0):

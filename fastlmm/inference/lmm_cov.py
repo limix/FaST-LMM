@@ -84,8 +84,7 @@ class LMM(object):
         """
         N = self.K.shape[0]
         D = self.linreg.D
-        ar = np.arange(self.K.shape[0])
-        self.K[ar,ar]+=1.0
+        self.K.flat[::N+1]+=1.0
         K_ = self.linreg.regress(Y=self.K)
         K_ = self.linreg.regress(Y=K_.T)
         [self.S,self.U] = la.eigh(K_)
@@ -166,8 +165,12 @@ class LMM(object):
         S,U = self.getSU()
         N = A.shape[0]
         D = self.linreg.D
+        A = self.linreg.regress(A)
+        # treat pathological case where a variable is explained by the covariates
+        A_std = A.std(0)
+        A[:,A_std<=1e-10] = 0.0
         if (S.shape[0] < N - D):#lowrank case
-            A = self.linreg.regress(A)
+            # A = self.linreg.regress(A)
             UA = self.U.T.dot(A)
             UUA = A - U.dot(UA)
         else:
@@ -665,11 +668,11 @@ class LMM(object):
                     'scale':scale}
         UY,UUY = self.getUY(idx_pheno = idx_pheno)
         P = UY.shape[1] #number of phenotypes used
-        YKY = computeAKA(Sd=Sd, denom=denom, UA=UY, UUA=UUY)
-        logdetK = np.log(Sd).sum()
-
-        if (UUY is not None):#low rank part
-            logdetK += (N - k) * np.log(denom)
+        # YKY = computeAKA(Sd=Sd, denom=denom, UA=UY, UUA=UUY)
+        # logdetK = np.log(Sd).sum()
+        #
+        # if (UUY is not None):#low rank part
+        #     logdetK+=(N - k) * np.log(denom)
 
         if (snps is not None) and (Usnps is None):
             assert snps.shape[0] == self.Y.shape[0], "shape missmatch between snps and Y"
@@ -828,7 +831,7 @@ class LMM(object):
             nLL = 0.5 * (logdetK + N * (np.log(2.0 * np.pi * sigma2) + 1))
         else:#Use multivariate student-t
             nLL = 0.5 * (logdetK + (dof + N) * np.log(1.0 + r2 / dof))
-            nLL +=  0.5 * N * np.log(dof * np.pi) + SS.gammaln(0.5 * dof) - SS.gammaln(0.5 * (dof + N))
+            nLL +=  0.5 * N * np.log(dof * np.pi) + ss.gammaln(0.5 * dof) - ss.gammaln(0.5 * (dof + N))
         result = {
                         'nLL':nLL,
                         'dof':dof,
@@ -868,7 +871,10 @@ class Linreg(object):
             self.beta = Y.mean(0)
         else:        
             if self.Xdagger is None:
-                self.Xdagger = la.pinv(self.X)       #SVD-based, and seems fast
+            	if self.X.shape[1]:
+                	self.Xdagger = la.pinv(self.X)       #SVD-based, and seems fast
+                else:
+                	self.Xdagger = np.zeros_like(self.X.T)
             self.beta = self.Xdagger.dot(Y)
 
     def regress(self, Y):
