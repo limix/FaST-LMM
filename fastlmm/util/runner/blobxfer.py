@@ -53,6 +53,7 @@ import mimetypes
 import multiprocessing
 import os
 import platform
+import logging
 # pylint: disable=F0401
 try:
     import queue
@@ -91,6 +92,9 @@ try:
 except ImportError:  # pragma: no cover
     pass
 import requests
+
+logging.getLogger('requests').setLevel(logging.CRITICAL)
+
 
 # remap keywords for Python3
 # pylint: disable=W0622,C0103
@@ -1461,7 +1465,7 @@ def create_dir_ifnotexists(dirname):
     """
     try:
         os.makedirs(dirname)
-        print('created local directory: {}'.format(dirname))
+        logging.debug('created local directory: {}'.format(dirname))
     except OSError as exc:
         if exc.errno != errno.EEXIST:
             raise  # pragma: no cover
@@ -1630,8 +1634,6 @@ def get_blob_listing(blob_service, args, metadata=True):
         except azure.common.AzureMissingResourceHttpError:
             break
         for blob in result:
-            if blob.name.endswith("Bed.py"): #!!!cmk debug
-                print("!!!cmk")
 
             blobdict[blob.name] = [
                 blob.properties.content_length,
@@ -1811,21 +1813,19 @@ def generate_xferspec_download(
     if (args.skiponmatch and contentmd5 is not None and
             os.path.exists(localfile)):
         if not args.skipskip: #!!!cmk
-            print('computing file md5 on: {} length: {}'.format(
+            logging.info('computing file md5 on: {} length: {}'.format(
                 localfile, contentlength))
         lmd5 = compute_md5_for_file_asbase64(localfile)
         if lmd5 != contentmd5:
-            print('  >> {} <L..R> {} {} '.format(
-                lmd5, contentmd5, remoteresource), end='')
-            print('MISMATCH: re-download')
+            logging.info('  >> {} <L..R> {} {} '.format(
+                lmd5, contentmd5, remoteresource)+' MISMATCH: re-download')
         else:
             if not args.skipskip: #!!!cmk
-                print('  >> {} <L..R> {} {} '.format(
-                    lmd5, contentmd5, remoteresource), end='')
-                print('match: skip')
+                logging.info('  >> {} <L..R> {} {} '.format(
+                    lmd5, contentmd5, remoteresource)+' match: skip')
             return None, None, None, None
     else:
-        print('remote blob: {} length: {} bytes, md5: {}'.format(
+        logging.info('remote blob: {} length: {} bytes, md5: {}'.format(
             remoteresource, contentlength, contentmd5))
     tmpfilename = localfile + '.blobtmp'
     if encmeta is not None:
@@ -1932,27 +1932,25 @@ def generate_xferspec_upload(
     md5digest = None
     if args.computefilemd5:
         if not args.skipskip: #!!!cmk
-            print('computing file md5 on: {}'.format(localfile))
+            logging.info('computing file md5 on: {}'.format(localfile))
         md5digest = compute_md5_for_file_asbase64(
             localfile, as_page_blob(args, localfile))
         # check if upload is needed
         remoteresource_key = remoteresource.replace("\\","/") #!!!cmk
         if args.skiponmatch and remoteresource_key in blobskipdict:
             if md5digest != blobskipdict[remoteresource_key][1]:
-                print('  >> {} <L..R> {} {} '.format(
+                logging.info('  >> {} <L..R> {} {} '.format(
                     md5digest, blobskipdict[remoteresource_key][1],
-                    remoteresource), end='')
-                print('MISMATCH: re-upload')
+                    remoteresource)+' MISMATCH: re-upload')
             else:
                 if not args.skipskip: #!!!cmk
-                    print('  >> {} <L..R> {} {} '.format(
+                    logging.info('  >> {} <L..R> {} {} '.format(
                         md5digest, blobskipdict[remoteresource_key][1],
-                        remoteresource), end='')
-                    print('match: skip')
+                        remoteresource)+' match: skip')
                 return None, 0, None, None
         else:
             if not args.skipskip: #!!!cmk
-                print('  >> md5: {}'.format(md5digest))
+                logging.info('  >> md5: {}'.format(md5digest))
     # create blockids entry
     if localfile not in blockids:
         blockids[localfile] = []
@@ -2257,7 +2255,7 @@ def main(exit_is_ok=True):
 
     # disable urllib3 warnings if specified
     if args.disableurllibwarnings:
-        print('!!! WARNING: DISABLING URLLIB3 WARNINGS !!!')
+        logging.info('!!! WARNING: DISABLING URLLIB3 WARNINGS !!!')
         requests.packages.urllib3.disable_warnings(
             requests.packages.urllib3.exceptions.InsecurePlatformWarning)
         requests.packages.urllib3.disable_warnings(
@@ -2281,53 +2279,53 @@ def main(exit_is_ok=True):
         'req=' + requests.__version__)
 
     # print all parameters
-    print('=====================================')
-    print(' azure blobxfer parameters [v{}]'.format(_SCRIPT_VERSION))
-    print('=====================================')
-    print('             platform: {}'.format(platform.platform()))
-    print('   python interpreter: {} {}'.format(
+    logging.debug('=====================================')
+    logging.debug(' azure blobxfer parameters [v{}]'.format(_SCRIPT_VERSION))
+    logging.debug('=====================================')
+    logging.debug('             platform: {}'.format(platform.platform()))
+    logging.debug('   python interpreter: {} {}'.format(
         platform.python_implementation(), platform.python_version()))
-    print('     package versions: {}'.format(' '.join(packages)))
+    logging.debug('     package versions: {}'.format(' '.join(packages)))
     del packages
-    print('      subscription id: {}'.format(args.subscriptionid))
-    print('      management cert: {}'.format(args.managementcert))
-    print('   transfer direction: {}'.format(
+    logging.debug('      subscription id: {}'.format(args.subscriptionid))
+    logging.debug('      management cert: {}'.format(args.managementcert))
+    logging.debug('   transfer direction: {}'.format(
         'local->Azure' if xfertoazure else 'Azure->local'))
-    print('       local resource: {}'.format(args.localresource))
-    print('      include pattern: {}'.format(args.include))
-    print('      remote resource: {}'.format(args.remoteresource))
-    print('   max num of workers: {}'.format(args.numworkers))
-    print('              timeout: {}'.format(args.timeout))
-    print('      storage account: {}'.format(args.storageaccount))
-    print('              use SAS: {}'.format(True if args.saskey else False))
-    print('  upload as page blob: {}'.format(args.pageblob))
-    print('  auto vhd->page blob: {}'.format(args.autovhd))
-    print(' upload to file share: {}'.format(args.fileshare))
-    print(' container/share name: {}'.format(args.container))
-    print('  container/share URI: {}'.format(endpoint + args.container))
-    print('    compute block MD5: {}'.format(args.computeblockmd5))
-    print('     compute file MD5: {}'.format(args.computefilemd5))
-    print('    skip on MD5 match: {}'.format(args.skiponmatch))
-    print('   chunk size (bytes): {}'.format(args.chunksizebytes))
-    print('     create container: {}'.format(args.createcontainer))
-    print('  keep mismatched MD5: {}'.format(args.keepmismatchedmd5files))
-    print('     recursive if dir: {}'.format(args.recursive))
-    print('component strip on up: {}'.format(args.stripcomponents))
-    print('        remote delete: {}'.format(args.delete))
-    print('           collate to: {}'.format(args.collate or 'disabled'))
-    print('      local overwrite: {}'.format(args.overwrite))
-    print('      encryption mode: {}'.format(
+    logging.debug('       local resource: {}'.format(args.localresource))
+    logging.debug('      include pattern: {}'.format(args.include))
+    logging.debug('      remote resource: {}'.format(args.remoteresource))
+    logging.debug('   max num of workers: {}'.format(args.numworkers))
+    logging.debug('              timeout: {}'.format(args.timeout))
+    logging.debug('      storage account: {}'.format(args.storageaccount))
+    logging.debug('              use SAS: {}'.format(True if args.saskey else False))
+    logging.debug('  upload as page blob: {}'.format(args.pageblob))
+    logging.debug('  auto vhd->page blob: {}'.format(args.autovhd))
+    logging.debug(' upload to file share: {}'.format(args.fileshare))
+    logging.debug(' container/share name: {}'.format(args.container))
+    logging.debug('  container/share URI: {}'.format(endpoint + args.container))
+    logging.debug('    compute block MD5: {}'.format(args.computeblockmd5))
+    logging.debug('     compute file MD5: {}'.format(args.computefilemd5))
+    logging.debug('    skip on MD5 match: {}'.format(args.skiponmatch))
+    logging.debug('   chunk size (bytes): {}'.format(args.chunksizebytes))
+    logging.debug('     create container: {}'.format(args.createcontainer))
+    logging.debug('  keep mismatched MD5: {}'.format(args.keepmismatchedmd5files))
+    logging.debug('     recursive if dir: {}'.format(args.recursive))
+    logging.debug('component strip on up: {}'.format(args.stripcomponents))
+    logging.debug('        remote delete: {}'.format(args.delete))
+    logging.debug('           collate to: {}'.format(args.collate or 'disabled'))
+    logging.debug('      local overwrite: {}'.format(args.overwrite))
+    logging.debug('      encryption mode: {}'.format(
         (args.encmode or 'disabled' if xfertoazure else 'file dependent')
         if args.rsaprivatekey is not None or args.rsapublickey is not None
         else 'disabled'))
-    print('         RSA key file: {}'.format(rsakeyfile or 'disabled'))
-    print('         RSA key type: {}'.format(
+    logging.debug('         RSA key file: {}'.format(rsakeyfile or 'disabled'))
+    logging.debug('         RSA key type: {}'.format(
         'private' if args.rsaprivatekey is not None else 'public'
         if args.rsapublickey is not None else 'disabled'))
-    print('=======================================\n')
+    logging.debug('=======================================\n')
 
     # mark start time after init
-    print('script start time: {}'.format(time.strftime("%Y-%m-%d %H:%M:%S")))
+    logging.debug('script start time: {}'.format(time.strftime("%Y-%m-%d %H:%M:%S")))
     start = time.time()
 
     # populate instruction queues
@@ -2349,7 +2347,7 @@ def main(exit_is_ok=True):
             blobskipdict = {}
         if os.path.isdir(args.localresource):
             if args.remoteresource is not None:
-                print('WARNING: ignoring specified remoteresource {} for '
+                logging.warn('WARNING: ignoring specified remoteresource {} for '
                       'directory upload'.format(args.remoteresource))
             _remotefiles = set()
             # mirror directory
@@ -2362,8 +2360,6 @@ def main(exit_is_ok=True):
                             continue
                         if fname.endswith("VC.opendb"): #!!!cmk make some .ignore-like option
                             continue
-                        if fname.endswith("Bed.py"): #!!!cmk make some .ignore-like option
-                            print("!!!cmk")
                         remotefname = apply_file_collation_and_strip(
                             args, fname)
                         _remotefiles.add(remotefname)
@@ -2432,6 +2428,7 @@ def main(exit_is_ok=True):
                     args.stripcomponents -= 1
             args.remoteresource = apply_file_collation_and_strip(
                 args, args.remoteresource)
+            #!!!cmkargs.remoteresource = "test1/test2/"+args.remoteresource#!!!cmk
             # manually pull file properties for file service
             if args.fileshare and args.skiponmatch:
                 fsfile = get_fileshare_file_properties(
@@ -2453,7 +2450,7 @@ def main(exit_is_ok=True):
         # create container/file share if needed
         if args.createcontainer:
             if args.fileshare:
-                print('creating file share, if needed: {}'.format(
+                logging.debug('creating file share, if needed: {}'.format(
                     args.container))
                 try:
                     azure_request(
@@ -2462,7 +2459,7 @@ def main(exit_is_ok=True):
                 except azure.common.AzureConflictHttpError:
                     pass
             else:
-                print('creating container, if needed: {}'.format(
+                logging.debug('creating container, if needed: {}'.format(
                     args.container))
                 try:
                     azure_request(
@@ -2473,7 +2470,7 @@ def main(exit_is_ok=True):
         # initialize page blobs or file share files
         if len(filemap) > 0:
             if args.pageblob or args.autovhd:
-                print('initializing page blobs')
+                logging.debug('initializing page blobs')
                 for key in filemap:
                     if as_page_blob(args, key):
                         blob_service[1].create_blob(
@@ -2482,7 +2479,7 @@ def main(exit_is_ok=True):
                             content_length=page_align_content_length(
                                 filesizes[key]), content_settings=None)
             elif args.fileshare:
-                print('initializing files on fileshare')
+                logging.debug('initializing files on fileshare')
                 dirscreated = set()
                 for key in filemap:
                     fsfile = split_fileshare_path_into_parts(filemap[key])
@@ -2509,7 +2506,7 @@ def main(exit_is_ok=True):
                 del dirscreated
     else:
         if args.remoteresource == '.':
-            print('attempting to copy entire {} {} to {}'.format(
+            logging.debug('attempting to copy entire {} {} to {}'.format(
                 'file share' if args.fileshare else 'container',
                 args.container, args.localresource))
             if args.fileshare:
@@ -2527,7 +2524,7 @@ def main(exit_is_ok=True):
             else:
                 blobdict = {args.remoteresource: [None, None, None]}
         if len(blobdict) > 0:
-            print('generating local directory structure and '
+            logging.debug('generating local directory structure and '
                   'pre-allocating space')
             # make the localresource directory
             created_dirs = set()
@@ -2566,7 +2563,7 @@ def main(exit_is_ok=True):
     # delete any remote blobs if specified
     if xfertoazure and delblobs is not None:
         if args.fileshare:
-            print('deleting {} remote files'.format(len(delblobs)))
+            logging.debug('deleting {} remote files'.format(len(delblobs)))
             for blob in delblobs:
                 fsfile = split_fileshare_path_into_parts(blob)
                 azure_request(
@@ -2574,15 +2571,15 @@ def main(exit_is_ok=True):
                     share_name=args.container, directory_name=fsfile[0],
                     file_name=fsfile[1], timeout=args.timeout)
         else:
-            print('deleting {} remote blobs'.format(len(delblobs)))
+            logging.debug('deleting {} remote blobs'.format(len(delblobs)))
             for blob in delblobs:
                 azure_request(
                     blob_service[0].delete_blob, timeout=args.timeout,
                     container_name=args.container, blob_name=blob)
-        print('deletion complete.')
+        logging.debug('deletion complete.')
 
     if nstorageops == 0:
-        print('detected no transfer actions needed to be taken, exiting...')
+        logging.info('detected no transfer actions needed to be taken, exiting...')
         if exit_is_ok:
             sys.exit(0)
         else:
@@ -2594,23 +2591,23 @@ def main(exit_is_ok=True):
         for fsize in filesizes.items():
             if fsize[1] == 0:
                 emptyfiles += 1
-        print('detected {} empty files to upload'.format(emptyfiles))
+        logging.debug('detected {} empty files to upload'.format(emptyfiles))
         if args.fileshare:
-            print('performing {} put ranges and {} set file properties'.format(
+            logging.debug('performing {} put ranges and {} set file properties'.format(
                 nstorageops, len(blockids) - emptyfiles))
             progress_text = 'ranges'
         elif args.pageblob:
-            print('performing {} put pages/blobs and {} set blob '
+            logging.debug('performing {} put pages/blobs and {} set blob '
                   'properties'.format(
                       nstorageops, len(blockids) - emptyfiles))
             progress_text = 'pages'
         elif args.autovhd:
-            print('performing {} mixed page/block operations with {} '
+            logging.debug('performing {} mixed page/block operations with {} '
                   'finalizing operations'.format(
                       nstorageops, len(blockids) - emptyfiles))
             progress_text = 'chunks'
         else:
-            print('performing {} put blocks/blobs and {} put block '
+            logging.debug('performing {} put blocks/blobs and {} put block '
                   'lists'.format(
                       nstorageops, len(blockids) - emptyfiles))
             progress_text = 'blocks'
@@ -2621,7 +2618,7 @@ def main(exit_is_ok=True):
     # spawn workers
     storage_out_queue = queue.Queue(nstorageops)
     maxworkers = min((args.numworkers, nstorageops))
-    print('spawning {} worker threads'.format(maxworkers))
+    logging.debug('spawning {} worker threads'.format(maxworkers))
     exc_list = []
     threads = []
     for _ in xrange(maxworkers):
@@ -2641,7 +2638,7 @@ def main(exit_is_ok=True):
         try:
             localresource, encparam = storage_out_queue.get()
         except KeyboardInterrupt:
-            print('\n\nKeyboardInterrupt detected, force terminating '
+            logging.info('\n\nKeyboardInterrupt detected, force terminating '
                   'threads (this may take a while)...')
             for thr in threads:
                 thr.terminate = True
@@ -2650,7 +2647,7 @@ def main(exit_is_ok=True):
             raise
         if len(exc_list) > 0:
             for exc in exc_list:
-                print(exc)
+                logging.debug(exc)
             sys.exit(1)
         if xfertoazure:
             completed_blockids[localresource] = completed_blockids[
@@ -2775,14 +2772,14 @@ def main(exit_is_ok=True):
     progress_bar(
         args.progressbar, 'xfer', progress_text, nstorageops,
         done_ops, storage_start)
-    print('\n\n{} MiB transfered, elapsed {} sec. '
+    logging.info('\n\n{} MiB transfered, elapsed {} sec. '
           'Throughput = {} Mbit/sec\n'.format(
               allfilesize / 1048576.0, endtime - storage_start,
               (8.0 * allfilesize / 1048576.0) / (endtime - storage_start)))
 
     # finalize files/blobs
     if not xfertoazure:
-        print(
+        logging.debug(
             'performing finalization (if applicable): {}: {}, MD5: {}'.format(
                 _ENCRYPTION_AUTH_ALGORITHM,
                 args.rsaprivatekey is not None, args.computefilemd5))
@@ -2811,14 +2808,14 @@ def main(exit_is_ok=True):
                         finalizefile = False
                     else:
                         skipmd5 = True
-                    print('[{}: {}, {}] {} <L..R> {}'.format(
+                    logging.debug('[{}: {}, {}] {} <L..R> {}'.format(
                         _ENCRYPTION_AUTH_ALGORITHM, res, localfile,
                         digest, hmacdict['sig']))
             # compare md5 hash
             if args.computefilemd5 and not skipmd5:
                 lmd5 = compute_md5_for_file_asbase64(tmpfilename)
                 if md5map[localfile] is None:
-                    print('[MD5: SKIPPED, {}] {} <L..R> {}'.format(
+                    logging.debug('[MD5: SKIPPED, {}] {} <L..R> {}'.format(
                         localfile, lmd5, md5map[localfile]))
                 else:
                     if lmd5 != md5map[localfile]:
@@ -2827,7 +2824,7 @@ def main(exit_is_ok=True):
                             finalizefile = False
                     else:
                         res = 'OK'
-                    print('[MD5: {}, {}] {} <L..R> {}'.format(
+                    logging.debug('[MD5: {}, {}] {} <L..R> {}'.format(
                         res, localfile, lmd5, md5map[localfile]))
             if finalizefile:
                 # check for existing file first
@@ -2842,11 +2839,11 @@ def main(exit_is_ok=True):
                 os.rename(tmpfilename, localfile)
             else:
                 os.remove(tmpfilename)
-        print('finalization complete.')
+        logging.debug('finalization complete.')
 
     # output final log lines
-    print('\nscript elapsed time: {} sec'.format(time.time() - start))
-    print('script end time: {}'.format(time.strftime("%Y-%m-%d %H:%M:%S")))
+    logging.debug('\nscript elapsed time: {} sec'.format(time.time() - start))
+    logging.debug('script end time: {}'.format(time.strftime("%Y-%m-%d %H:%M:%S")))
 
 
 def progress_bar(display, sprefix, rtext, value, qsize, start):
@@ -3021,4 +3018,5 @@ def parseargs():  # pragma: no cover
     return parser.parse_args()
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
     main()

@@ -5,9 +5,9 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{9144f8b5-632b-4a72-bd8e-01d453affb5a}</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>runner\AzureBatch.py</StartupFile>
+    <StartupFile>runner\blobxfer.py</StartupFile>
     <SearchPath>c:\source\carlk\fastlmm;c:\source\carlk\pysnptools</SearchPath>
-    <WorkingDirectory>.</WorkingDirectory>
+    <WorkingDirectory>c:\deldir\test</WorkingDirectory>
     <OutputPath>.</OutputPath>
     <Name>util</Name>
     <RootNamespace>util</RootNamespace>

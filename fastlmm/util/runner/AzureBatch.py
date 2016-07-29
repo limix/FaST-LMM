@@ -26,6 +26,7 @@ if azure_ok:
     import azure.batch.batch_auth as batchauth 
     from fastlmm.util.runner.blobxfer import run_command_string as blobxfer #https://pypi.io/project/blobxfer/
 
+
 class AzureBatch: # implements IRunner
     def __init__(self, task_count, min_node_count, max_node_count, pool_id, mkl_num_threads = None,
                  logging_handler=logging.StreamHandler(sys.stdout)):
@@ -182,30 +183,52 @@ cd %AZ_BATCH_TASK_WORKING_DIR%\..\..\output
 
         #!!!cmk document that maxTasksPerNode and packing policy are per-pool and setting the values will over ride previous values
 
-        if True: #!!!cmk turned off while debugging so can remote into VMs without them be taken away
-            auto_scale_formula=r"""// Get pending tasks for the past 15 minutes.
-    $Samples = $ActiveTasks.GetSamplePercent(TimeInterval_Minute * 15);
-    // If we have fewer than 70 percent data points, we use the last sample point, otherwise we use the maximum of
-    // last sample point and the history average.
-    $Tasks = $Samples < 70 ? max(0,$ActiveTasks.GetSample(1)) : max( $ActiveTasks.GetSample(1), avg($ActiveTasks.GetSample(TimeInterval_Minute * 15)));
-    // If number of pending tasks is not 0, set targetVM to pending tasks, otherwise half of current dedicated.
-    $TargetVMs = $Tasks > 0? $Tasks:max(0, $TargetDedicated/2);
-    // The pool size is capped at 20, if target VM value is more than that, set it to 20. This value
-    // should be adjusted according to your use case.
-    $TargetDedicated = max({0},min($TargetVMs,{1}));
+        if False: #!!!cmk turned off while debugging so can remote into VMs without them be taken away
+
+
+        #"""totalNodes=($CPUPercent.GetSamplePercent(TimeInterval_Minute*0,TimeInterval_Minute*10)<0.7
+        #               ?5
+        #               :(min($CPUPercent.GetSample(TimeInterval_Minute*0, TimeInterval_Minute*10))>0.8
+        #                ?($CurrentDedicated*1.1):
+        #                  $CurrentDedicated));
+        #                $TargetDedicated=min(100,totalNodes);"""
+
+            auto_scale_formula=r"""// Get pending tasks for the past 120 minutes.
+    $Tasks = max($ActiveTasks.GetSample(TimeInterval_Minute * 120,1));
+    $TargetDedicated = max({0},min($Tasks,{1}));
     // Set node deallocation mode - keep nodes active only until tasks finish
     $NodeDeallocationOption = taskcompletion;
     """.format(self.min_node_count,self.max_node_count)
             batch_client.pool.enable_auto_scale(
                     self.pool_id,
                     auto_scale_formula=auto_scale_formula,
-                    auto_scale_evaluation_interval=datetime.timedelta(minutes=10) 
+                    auto_scale_evaluation_interval=datetime.timedelta(minutes=5) 
                 )
+
+
+    #        auto_scale_formula=r"""// Get pending tasks for the past 15 minutes.
+    #$Samples = $ActiveTasks.GetSamplePercent(TimeInterval_Minute * 15);
+    #// If we have fewer than 70 percent data points, we use the last sample point, otherwise we use the maximum of
+    #// last sample point and the history average.
+    #$Tasks = $Samples < 70 ? max(0,$ActiveTasks.GetSample(1)) : max( $ActiveTasks.GetSample(1), avg($ActiveTasks.GetSample(TimeInterval_Minute * 15)));
+    #// If number of pending tasks is not 0, set targetVM to pending tasks, otherwise half of current dedicated.
+    #$TargetVMs = $Tasks > 0? $Tasks:max(0, $TargetDedicated/2);
+    #// The pool size is capped at max_node_count, if target VM value is more than that, set it to max_node_count. This value
+    #// should be adjusted according to your use case.
+    #$TargetDedicated = max({0},min($TargetVMs,{1}));
+    #// Set node deallocation mode - keep nodes active only until tasks finish
+    #$NodeDeallocationOption = taskcompletion;
+    #""".format(self.min_node_count,self.max_node_count)
+    #        batch_client.pool.enable_auto_scale(
+    #                self.pool_id,
+    #                auto_scale_formula=auto_scale_formula,
+    #                auto_scale_evaluation_interval=datetime.timedelta(minutes=10) 
+    #            )
 
         ####################################################
         # Create a job with a job prep task
         ####################################################
-        job_id = commonhelpers.generate_unique_resource_name(distributable.tempdirectory.replace("_","-")) #!!!cmk is the replace needed? Is it enough?
+        job_id = commonhelpers.generate_unique_resource_name(distributable.name.replace("_","-").replace("/","-").replace(".","-")) #!!!cmk is the replace needed? Is it enough?
 
         job_preparation_task = batchmodels.JobPreparationTask(
                 id="jobprep",
@@ -253,16 +276,14 @@ cd %AZ_BATCH_TASK_WORKING_DIR%\..\..\output
             raise exception
  
         sleep_sec = 5
+        
         while True:
-            logging.info("again")
             tasks = batch_client.task.list(job_id)
             counter = Counter(task.state.value for task in tasks)
-            for state, count in counter.iteritems():
-                logging.info("{0}: {1}".format(state, count))
+            logging.info(", ".join(("{0}: {1}".format(state, count) for state, count in counter.iteritems())))
             if counter['completed'] == sum(counter.values()) :
                 break
             time.sleep(sleep_sec)
-            sleep_sec = min(sleep_sec * 1.1,60)
  
  
         #tasks = batch_client.task.list(job_id) 
@@ -472,13 +493,13 @@ if __name__ == "__main__":
         from fastlmm.util.runner.AzureBatch import test_fun
         from fastlmm.util.runner import Local, HPC, LocalMultiProc
 
-        runner = AzureBatch(task_count=20,min_node_count=2,max_node_count=7,pool_id="twoa2x2") #!!!cmk there is a default core limit of 99
+        runner = AzureBatch(task_count=20,min_node_count=2,max_node_count=7,pool_id="a4x1") #!!!cmk there is a default core limit of 99
         #runner = LocalMultiProc(2)
         test_fun(runner)
 
 
 # When there is an error, say so, don't just return the result from the previous good run
-# Copy 2+ python path to the machines
+
 # Auto config
 #   auto upload python zip file
 #   create pool for scratch or use an existing one
@@ -487,8 +508,10 @@ if __name__ == "__main__":
 # control the default core limit so can have more than taskcount=99
 # Need share access Pool if want nodes to talk to each other?
 # is 'datetime.timedelta(minutes=25)' right?
+#!!!!cmk need to documenent increasing core count: https://azure.microsoft.com/en-us/blog/azure-limits-quotas-increase-requests/
 
 # DONE:
+# Copy 2+ python path to the machines
 # Stop using fastlmm2 for storage
 # Can run multiple jobs at once and they don't clobber each other
 # Remove C:\user\tasks\ from code and use an enviornment variable instead

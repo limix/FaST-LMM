@@ -3,7 +3,7 @@ import logging
 import unittest
 import cStringIO
 
-class DistributableTest(object) : #implements IDistributable
+class DistributableTest(object) : #implements IDistributable #!!!cmk needs to implement .name
     '''
     This is a class for distributing any testing. It shouldn't be confused with TestDistributable which is a class for
     testing the distributable classes.

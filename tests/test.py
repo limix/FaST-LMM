@@ -216,9 +216,11 @@ if __name__ == '__main__':
         #runner = AzureBatch(task_count=74,min_node_count=2,max_node_count=7,pool_id="twoa2x2")
         #!!!cmk also if task_count for AzureBatch is > 99, it fails with an error message that is hard to understand.
 
-        runner = AzureBatch(task_count=75,min_node_count=2,max_node_count=7,pool_id="twoa2x2")
+        #runner = AzureBatch(task_count=75,min_node_count=2,max_node_count=7,pool_id="twoa2x2")
+        runner = AzureBatch(task_count=75,min_node_count=2,max_node_count=10,pool_id="a4x1")
         distributable_test = DistributableTest(suites_cmk,"temp_test")
-        print runner.run(distributable_test)
+        for i in xrange(10):
+            print runner.run(distributable_test)
 
     debian_count = len(os.listdir('expected-debian'))
     if debian_count > 0:
