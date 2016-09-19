@@ -19,13 +19,15 @@ def mf_to_runner_function(mf):
     clean_up=False
 
     if mf == "debug":
-        runner_function = lambda ignore: LocalInParts(1000,1000,mkl_num_threads=20,result_file="result.p",run_dir=r"\\GCR\Scratch\B99\escience\carlk\data\carlk\cachebio\genetics\uganda\runs\2016-03-03_14_40_27_822760552694")
+        runner_function = lambda ignore: LocalInParts(22,22,mkl_num_threads=20,result_file="result.p",run_dir=r"C:\deldir\test\outputx") 
     elif mf == "local":
         runner_function = lambda ignore: Local()
     elif mf == "local1":
         runner_function = lambda ignore: Local(1)
     elif mf == "lmp":
         runner_function = lambda ignore: LocalMultiProc(22,5)
+    elif mf == "lmp4":
+        runner_function = lambda ignore: LocalMultiProc(4,5)
     elif mf == "lmpl":
         runner_function = lambda taskcount: LocalMultiProc(taskcount,22,just_one_process=True)
     elif mf == "azure":

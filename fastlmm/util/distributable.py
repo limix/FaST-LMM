@@ -24,14 +24,14 @@ class IDistributable(object):
         raise NotImplementedError( "Should have implemented this" )
         return # Tells how many work items there are
 
-    def work_sequence_range(self, start, end):
+    def work_sequence_range(self, start, stop):
         # Enumerates a sequence of work items starting at 'start' and ending right before 'end'
         # for example by 'yield'ing lambda (aka function pointers) that can be evaluated with no parameters
         #         the result of evaluating a work item can be anything, but it must be picklable
         # Can also yield IDistributable objects (thus the map-reduce can be nested).
         # If you like, you can define 'work_sequence_range' in terms of 'work_sequence'
         #         import itertools
-        #         return islice(self.work_sequence(),start,end)
+        #         return islice(self.work_sequence(),start,stop)
         raise NotImplementedError( "Should have implemented this" )
 
 

@@ -1593,7 +1593,7 @@ def run_command_string(command_string, wd=None):
         os.chdir(wd)
 
     sys.argv = command_string.split(" ")
-    main(exit_is_ok=False)
+    main_robust(exit_is_ok=False)
 
     if wd is not None:
         os.chdir(temp2)
@@ -2033,8 +2033,177 @@ def apply_file_collation_and_strip(args, fname):
             remotefname = "/".join(rtmp[nsc:])
     return remotefname
 
+def progress_bar(display, sprefix, rtext, value, qsize, start):
+    """Display a progress bar
+    Parameters:
+        display - display bar
+        sprefix - progress prefix
+        rtext - rate text
+        value - value input value
+        qsize - queue size
+        start - start time
+    Returns:
+        Nothing
+    Raises:
+        Nothing
+    """
+    if not display:
+        return
+    done = float(qsize) / value
+    diff = time.time() - start
+    if diff <= 0:
+        # arbitrarily give a small delta
+        diff = 1e-6
+    rate = float(qsize) / (diff / 60)
+    sys.stdout.write(
+        '\r{0} progress: [{1:30s}] {2:.2f}% {3:10.2f} {4}/min    '.format(
+            sprefix, '>' * int(done * 30), done * 100, rate, rtext))
+    sys.stdout.flush()
 
-def main(exit_is_ok=True):
+def parseargs():  # pragma: no cover
+    """Sets up command-line arguments and parser
+    Parameters:
+        Nothing
+    Returns:
+        Parsed command line arguments
+    Raises:
+        Nothing
+    """
+    parser = argparse.ArgumentParser(
+        description='Transfer files/blobs to/from Azure blob or file storage')
+    parser.set_defaults(
+        autovhd=False, endpoint=_DEFAULT_STORAGE_ENDPOINT,
+        chunksizebytes=_MAX_BLOB_CHUNK_SIZE_BYTES, collate=None,
+        computeblockmd5=False, computefilemd5=True, createcontainer=True,
+        delete=False, disableurllibwarnings=False,
+        encmode=_DEFAULT_ENCRYPTION_MODE, fileshare=False, include=None,
+        managementep=_DEFAULT_MANAGEMENT_ENDPOINT,
+        numworkers=_DEFAULT_MAX_STORAGEACCOUNT_WORKERS, overwrite=True,
+        pageblob=False, progressbar=True, recursive=True, rsaprivatekey=None,
+        rsapublickey=None, rsakeypassphrase=None, skiponmatch=True,
+        stripcomponents=None, timeout=None)
+    parser.add_argument('storageaccount', help='name of storage account')
+    parser.add_argument(
+        'container',
+        help='name of blob container or file share')
+    parser.add_argument(
+        'localresource',
+        help='name of the local file or directory, if mirroring. "."=use '
+        'current directory')
+    parser.add_argument(
+        '--autovhd', action='store_true',
+        help='automatically upload files ending in .vhd as page blobs')
+    parser.add_argument(
+        '--collate', nargs='?',
+        help='collate all files into a specified path')
+    parser.add_argument(
+        '--computeblockmd5', dest='computeblockmd5', action='store_true',
+        help='compute block/page level MD5 during upload')
+    parser.add_argument(
+        '--chunksizebytes', type=int,
+        help='maximum chunk size to transfer in bytes [{}]'.format(
+            _MAX_BLOB_CHUNK_SIZE_BYTES))
+    parser.add_argument(
+        '--delete', action='store_true',
+        help='delete extraneous remote blobs that have no corresponding '
+        'local file when uploading directories')
+    parser.add_argument(
+        '--disable-urllib-warnings', action='store_true',
+        dest='disableurllibwarnings',
+        help='disable urllib warnings (not recommended)')
+    parser.add_argument(
+        '--download', action='store_true',
+        help='force transfer direction to download from Azure')
+    parser.add_argument(
+        '--encmode',
+        help='encryption mode [{}]'.format(_DEFAULT_ENCRYPTION_MODE))
+    parser.add_argument(
+        '--endpoint',
+        help='storage endpoint [{}]'.format(_DEFAULT_STORAGE_ENDPOINT))
+    parser.add_argument(
+        '--fileshare', action='store_true',
+        help='transfer to a file share rather than block/page blob')
+    parser.add_argument(
+        '--include', type=str,
+        help='include pattern (Unix shell-style wildcards)')
+    parser.add_argument(
+        '--keepmismatchedmd5files', action='store_true',
+        help='keep files with MD5 mismatches')
+    parser.add_argument(
+        '--managementcert',
+        help='path to management certificate .pem file')
+    parser.add_argument(
+        '--managementep',
+        help='management endpoint [{}]'.format(_DEFAULT_MANAGEMENT_ENDPOINT))
+    parser.add_argument(
+        '--no-computefilemd5', dest='computefilemd5', action='store_false',
+        help='do not compute file MD5 and either upload as metadata '
+        'or validate on download')
+    parser.add_argument(
+        '--no-createcontainer', dest='createcontainer', action='store_false',
+        help='do not create container if it does not exist')
+    parser.add_argument(
+        '--no-overwrite', dest='overwrite', action='store_false',
+        help='do not overwrite local files on download')
+    parser.add_argument(
+        '--no-progressbar', dest='progressbar', action='store_false',
+        help='disable progress bar')
+    parser.add_argument(
+        '--no-recursive', dest='recursive', action='store_false',
+        help='do not mirror local directory recursively')
+    parser.add_argument(
+        '--no-skiponmatch', dest='skiponmatch', action='store_false',
+        help='do not skip upload/download on MD5 match')
+    parser.add_argument(
+        '--numworkers', type=int,
+        help='max number of workers [{}]'.format(
+            _DEFAULT_MAX_STORAGEACCOUNT_WORKERS))
+    parser.add_argument(
+        '--pageblob', action='store_true',
+        help='upload as page blob rather than block blob, blobs will '
+        'be page-aligned in Azure storage')
+    parser.add_argument(
+        '--rsaprivatekey',
+        help='RSA private key file in PEM format. Specifying an RSA private '
+        'key will turn on decryption (or encryption). An RSA private key is '
+        'required for downloading and decrypting blobs and may be specified '
+        'for encrypting and uploading blobs.')
+    parser.add_argument(
+        '--rsapublickey',
+        help='RSA public key file in PEM format. Specifying an RSA public '
+        'key will turn on encryption. An RSA public key can only be used '
+        'for encrypting and uploading blobs.')
+    parser.add_argument(
+        '--rsakeypassphrase',
+        help='Optional passphrase for decrypting an RSA private key.')
+    parser.add_argument(
+        '--remoteresource',
+        help='name of remote resource on Azure storage. "."=container '
+        'copy recursive implied')
+    parser.add_argument(
+        '--saskey',
+        help='SAS key to use, if recursive upload or container download, '
+        'this must be a container SAS')
+    parser.add_argument( #!!!cmk
+        '--skipskip', action='store_true',
+        help='skip messages about computing md5 and skipping files')
+    parser.add_argument(
+        '--storageaccountkey',
+        help='storage account shared key')
+    parser.add_argument(
+        '--strip-components', dest='stripcomponents', type=int,
+        help='strip N leading components from path on upload [1]')
+    parser.add_argument('--subscriptionid', help='subscription id')
+    parser.add_argument(
+        '--timeout', type=float,
+        help='timeout in seconds for any operation to complete')
+    parser.add_argument(
+        '--upload', action='store_true',
+        help='force transfer direction to upload to Azure')
+    parser.add_argument('--version', action='version', version=_SCRIPT_VERSION)
+    return parser.parse_args()
+
+def main_internal(exit_is_ok):
     """Main function
     Parameters:
         None
@@ -2192,7 +2361,7 @@ def main(exit_is_ok=True):
     if args.fileshare and file_service is None:
         raise ValueError('file_service is invalid')
 
-    # check which way we're transfering
+    # check which way we're transferring
     xfertoazure = False
     if (args.upload or
             (not args.download and os.path.exists(args.localresource))):
@@ -2579,7 +2748,7 @@ def main(exit_is_ok=True):
         logging.debug('deletion complete.')
 
     if nstorageops == 0:
-        logging.info('detected no transfer actions needed to be taken, exiting...')
+        logging.info('detected no transfer actions needed to be taken')
         if exit_is_ok:
             sys.exit(0)
         else:
@@ -2845,178 +3014,30 @@ def main(exit_is_ok=True):
     logging.debug('\nscript elapsed time: {} sec'.format(time.time() - start))
     logging.debug('script end time: {}'.format(time.strftime("%Y-%m-%d %H:%M:%S")))
 
+def main_robust(exit_is_ok=True): #!!!!cmk for exceptions like "The specified blob does not exist" it's kind of silly to re-try even once, let alone 49 times.
+    do_robust=True
 
-def progress_bar(display, sprefix, rtext, value, qsize, start):
-    """Display a progress bar
-    Parameters:
-        display - display bar
-        sprefix - progress prefix
-        rtext - rate text
-        value - value input value
-        qsize - queue size
-        start - start time
-    Returns:
-        Nothing
-    Raises:
-        Nothing
-    """
-    if not display:
-        return
-    done = float(qsize) / value
-    diff = time.time() - start
-    if diff <= 0:
-        # arbitrarily give a small delta
-        diff = 1e-6
-    rate = float(qsize) / (diff / 60)
-    sys.stdout.write(
-        '\r{0} progress: [{1:30s}] {2:.2f}% {3:10.2f} {4}/min    '.format(
-            sprefix, '>' * int(done * 30), done * 100, rate, rtext))
-    sys.stdout.flush()
+    if do_robust:
+        sleep_time = 1.0
+        is_ok = False
+        for try_index in xrange(50):
+            try:
+                main_internal(exit_is_ok=exit_is_ok)
+                is_ok = True
+                break
+            except Exception as e:
+                s = str(e).strip()
+                if "[Errno 2] No such file or directory" in s or "The specified blob does not exist." in s:
+                    raise # rethrow the exception
+                logging.info("In blobxfer, exception #{0}, will sleep {1}: '{2}'".format(try_index,sleep_time,s))
+                time.sleep(sleep_time)
+                sleep_time = min(60.0,sleep_time*1.1)
+        if not is_ok:
+            raise Exception("blobxfer fails")
+    else:
+        main_internal(exit_is_ok=exit_is_ok)
 
-
-def parseargs():  # pragma: no cover
-    """Sets up command-line arguments and parser
-    Parameters:
-        Nothing
-    Returns:
-        Parsed command line arguments
-    Raises:
-        Nothing
-    """
-    parser = argparse.ArgumentParser(
-        description='Transfer files/blobs to/from Azure blob or file storage')
-    parser.set_defaults(
-        autovhd=False, endpoint=_DEFAULT_STORAGE_ENDPOINT,
-        chunksizebytes=_MAX_BLOB_CHUNK_SIZE_BYTES, collate=None,
-        computeblockmd5=False, computefilemd5=True, createcontainer=True,
-        delete=False, disableurllibwarnings=False,
-        encmode=_DEFAULT_ENCRYPTION_MODE, fileshare=False, include=None,
-        managementep=_DEFAULT_MANAGEMENT_ENDPOINT,
-        numworkers=_DEFAULT_MAX_STORAGEACCOUNT_WORKERS, overwrite=True,
-        pageblob=False, progressbar=True, recursive=True, rsaprivatekey=None,
-        rsapublickey=None, rsakeypassphrase=None, skiponmatch=True,
-        stripcomponents=None, timeout=None)
-    parser.add_argument('storageaccount', help='name of storage account')
-    parser.add_argument(
-        'container',
-        help='name of blob container or file share')
-    parser.add_argument(
-        'localresource',
-        help='name of the local file or directory, if mirroring. "."=use '
-        'current directory')
-    parser.add_argument(
-        '--autovhd', action='store_true',
-        help='automatically upload files ending in .vhd as page blobs')
-    parser.add_argument(
-        '--collate', nargs='?',
-        help='collate all files into a specified path')
-    parser.add_argument(
-        '--computeblockmd5', dest='computeblockmd5', action='store_true',
-        help='compute block/page level MD5 during upload')
-    parser.add_argument(
-        '--chunksizebytes', type=int,
-        help='maximum chunk size to transfer in bytes [{}]'.format(
-            _MAX_BLOB_CHUNK_SIZE_BYTES))
-    parser.add_argument(
-        '--delete', action='store_true',
-        help='delete extraneous remote blobs that have no corresponding '
-        'local file when uploading directories')
-    parser.add_argument(
-        '--disable-urllib-warnings', action='store_true',
-        dest='disableurllibwarnings',
-        help='disable urllib warnings (not recommended)')
-    parser.add_argument(
-        '--download', action='store_true',
-        help='force transfer direction to download from Azure')
-    parser.add_argument(
-        '--encmode',
-        help='encryption mode [{}]'.format(_DEFAULT_ENCRYPTION_MODE))
-    parser.add_argument(
-        '--endpoint',
-        help='storage endpoint [{}]'.format(_DEFAULT_STORAGE_ENDPOINT))
-    parser.add_argument(
-        '--fileshare', action='store_true',
-        help='transfer to a file share rather than block/page blob')
-    parser.add_argument(
-        '--include', type=str,
-        help='include pattern (Unix shell-style wildcards)')
-    parser.add_argument(
-        '--keepmismatchedmd5files', action='store_true',
-        help='keep files with MD5 mismatches')
-    parser.add_argument(
-        '--managementcert',
-        help='path to management certificate .pem file')
-    parser.add_argument(
-        '--managementep',
-        help='management endpoint [{}]'.format(_DEFAULT_MANAGEMENT_ENDPOINT))
-    parser.add_argument(
-        '--no-computefilemd5', dest='computefilemd5', action='store_false',
-        help='do not compute file MD5 and either upload as metadata '
-        'or validate on download')
-    parser.add_argument(
-        '--no-createcontainer', dest='createcontainer', action='store_false',
-        help='do not create container if it does not exist')
-    parser.add_argument(
-        '--no-overwrite', dest='overwrite', action='store_false',
-        help='do not overwrite local files on download')
-    parser.add_argument(
-        '--no-progressbar', dest='progressbar', action='store_false',
-        help='disable progress bar')
-    parser.add_argument(
-        '--no-recursive', dest='recursive', action='store_false',
-        help='do not mirror local directory recursively')
-    parser.add_argument(
-        '--no-skiponmatch', dest='skiponmatch', action='store_false',
-        help='do not skip upload/download on MD5 match')
-    parser.add_argument(
-        '--numworkers', type=int,
-        help='max number of workers [{}]'.format(
-            _DEFAULT_MAX_STORAGEACCOUNT_WORKERS))
-    parser.add_argument(
-        '--pageblob', action='store_true',
-        help='upload as page blob rather than block blob, blobs will '
-        'be page-aligned in Azure storage')
-    parser.add_argument(
-        '--rsaprivatekey',
-        help='RSA private key file in PEM format. Specifying an RSA private '
-        'key will turn on decryption (or encryption). An RSA private key is '
-        'required for downloading and decrypting blobs and may be specified '
-        'for encrypting and uploading blobs.')
-    parser.add_argument(
-        '--rsapublickey',
-        help='RSA public key file in PEM format. Specifying an RSA public '
-        'key will turn on encryption. An RSA public key can only be used '
-        'for encrypting and uploading blobs.')
-    parser.add_argument(
-        '--rsakeypassphrase',
-        help='Optional passphrase for decrypting an RSA private key.')
-    parser.add_argument(
-        '--remoteresource',
-        help='name of remote resource on Azure storage. "."=container '
-        'copy recursive implied')
-    parser.add_argument(
-        '--saskey',
-        help='SAS key to use, if recursive upload or container download, '
-        'this must be a container SAS')
-    parser.add_argument( #!!!cmk
-        '--skipskip', action='store_true',
-        help='skip messages about computing md5 and skipping files')
-    parser.add_argument(
-        '--storageaccountkey',
-        help='storage account shared key')
-    parser.add_argument(
-        '--strip-components', dest='stripcomponents', type=int,
-        help='strip N leading components from path on upload [1]')
-    parser.add_argument('--subscriptionid', help='subscription id')
-    parser.add_argument(
-        '--timeout', type=float,
-        help='timeout in seconds for any operation to complete')
-    parser.add_argument(
-        '--upload', action='store_true',
-        help='force transfer direction to upload to Azure')
-    parser.add_argument('--version', action='version', version=_SCRIPT_VERSION)
-    return parser.parse_args()
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    main()
+    main_robust()

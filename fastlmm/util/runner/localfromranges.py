@@ -14,27 +14,27 @@ class LocalFromRanges: # implements IRunner
     '''
     Created mostly for testing. This runner divides the work_sequence into a series of ranges.
     '''
-    def __init__(self, end_list, mkl_num_threads=None):
-        self.end_list = end_list
+    def __init__(self, stop_list, mkl_num_threads=None):
+        self.stop_list = stop_list
         if mkl_num_threads != None:
             os.environ['MKL_NUM_THREADS'] = str(mkl_num_threads)
 
 
-    def work_sequence_range(self,distributable,start,end):
+    def work_sequence_range(self,distributable,start,stop):
         if hasattr(distributable,"work_sequence_range"):
-            return distributable.work_sequence_range(start,end)
+            return distributable.work_sequence_range(start,stop)
         else:
-            return isplice(distributable.work_sequence,start,end)
+            return isplice(distributable.work_sequence,start,stop)
 
     def distributable_to_result_sequence_via_range(self, distributable):
         start = 0
-        for end in self.end_list:
-            assert start <= end, "The end_list must be a list of sorted non-negative numbers."
-            work_sequence = self.work_sequence_range(distributable,start,end)
+        for stop in self.stop_list:
+            assert start <= stop, "The end_list must be a list of sorted non-negative numbers."
+            work_sequence = self.work_sequence_range(distributable,start,stop)
             result_sequence = work_sequence_to_result_sequence(work_sequence)
             for result in result_sequence:
                 yield result
-            start = end
+            start = stop
 
     def run(self, distributable):
         JustCheckExists().input(distributable)
@@ -42,7 +42,7 @@ class LocalFromRanges: # implements IRunner
         if callable(distributable):
             result = distributable()
         else:
-            count = self.end_list[-1]
+            count = self.stop_list[-1]
             assert 0 <= count, "The end_list must be a list of sorted non-negative numbers."
             shaped_distributable = shape_to_desired_workcount(distributable, count)
             result_sequence = self.distributable_to_result_sequence_via_range(shaped_distributable)

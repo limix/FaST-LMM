@@ -43,7 +43,7 @@ class DistributedMap(object): #implements IDistributable
     def work_sequence(self):
 
         for i, input_arg in enumerate(self.input_args):
-            logging.debug("executing %i" % i)
+            logging.debug("\nexecuting %i" % i)
             yield lambda i=i, input_arg=input_arg: self.dowork(i, input_arg)
             # the 'i=i',etc is need to get around a strangeness in Python
 
@@ -62,7 +62,7 @@ class DistributedMap(object): #implements IDistributable
 
     def dowork(self, i, input_args):
         #logging.info("{0}, {1}".format(len(train_snp_idx), len(test_snp_idx)))
-        logging.debug("executing %s" % str(input_args))
+        logging.debug("\nexecuting %s" % str(input_args))
         result = apply(self.function, [input_args])
 
         return result

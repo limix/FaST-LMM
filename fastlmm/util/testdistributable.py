@@ -66,9 +66,9 @@ class A (object): #implements IDistributable
     def work_sequence(self):
         return self._work_sequence_range(0,self.work_count)
 
-    def _work_sequence_range(self,start,end):
-        assert 0<= start and start<= end and end <= self.work_count
-        for work_index in xrange(start,end):
+    def _work_sequence_range(self,start,stop):
+        assert 0<= start and start<= stop and stop <= self.work_count
+        for work_index in xrange(start,stop):
             if self.sub_work_count == 0:
                 yield lambda work_index=work_index : "{0}[{1}]".format(self.name,work_index)  # the 'work_index=work_index' is need to get around a strangeness in Python
             else:

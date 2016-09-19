@@ -5,9 +5,10 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{9144f8b5-632b-4a72-bd8e-01d453affb5a}</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>runner\blobxfer.py</StartupFile>
+    <StartupFile>runner\examples.py</StartupFile>
     <SearchPath>c:\source\carlk\fastlmm;c:\source\carlk\pysnptools</SearchPath>
-    <WorkingDirectory>c:\deldir\test</WorkingDirectory>
+    <WorkingDirectory>
+    </WorkingDirectory>
     <OutputPath>.</OutputPath>
     <Name>util</Name>
     <RootNamespace>util</RootNamespace>
@@ -64,10 +65,12 @@
     <Compile Include="runner\delme.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="runner\examples.py" />
     <Compile Include="runner\Hadoop.py" />
     <Compile Include="runner\Hadoop2.py" />
     <Compile Include="runner\HPC.py" />
     <Compile Include="runner\localfromranges.py" />
+    <Compile Include="runner\LocalMultiThread.py" />
     <Compile Include="runner\LocalReducer.py" />
     <Compile Include="runner\LocalMapper.py" />
     <Compile Include="runner\LocalMultiProc.py" />
@@ -104,7 +107,10 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="runner\PythonInstall.bat" />
+    <Content Include="stats\quadform\qfc_src\QFC.cpp" />
+    <Content Include="stats\quadform\qfc_src\QFC.h" />
     <Content Include="stats\quadform\qfc_src\wrap_qfc.cpp" />
+    <Content Include="stats\quadform\qfc_src\wrap_qfc.pyx" />
   </ItemGroup>
   <Import Project="$(PtvsTargetsFile)" Condition="Exists($(PtvsTargetsFile))" />
   <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" Condition="!Exists($(PtvsTargetsFile))" />

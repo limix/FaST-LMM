@@ -33,7 +33,8 @@ import fastlmm.inference.linear_regression as lin_reg
 def single_snp(test_snps, pheno, K0=None,
                  K1=None, mixing=None,
                  covar=None, covar_by_chrom=None, leave_out_one_chrom=True, output_file_name=None, h2=None, log_delta=None,
-                 cache_file = None, GB_goal=None, interact_with_snp=None, force_full_rank=False, force_low_rank=False, G0=None, G1=None, runner=None):
+                 cache_file = None, GB_goal=None, interact_with_snp=None, force_full_rank=False, force_low_rank=False, G0=None, G1=None, runner=None,
+                 count_A1=None): #!!!cmk document count_A1
     """
     Function performing single SNP GWAS using cross validation over the chromosomes and REML. Will reorder and intersect IIDs as needed.
     (For backwards compatibility, you may use 'leave_out_one_chrom=False' to skip cross validation, but that is not recommended.)
@@ -139,16 +140,16 @@ def single_snp(test_snps, pheno, K0=None,
         raise Exception("Can't force both full rank and low rank")
 
     assert test_snps is not None, "test_snps must be given as input"
-    test_snps = _snps_fixup(test_snps)
-    pheno = _pheno_fixup(pheno).read()
+    test_snps = _snps_fixup(test_snps, count_A1=count_A1)
+    pheno = _pheno_fixup(pheno, count_A1=count_A1).read()
     assert pheno.sid_count == 1, "Expect pheno to be just one variable"
     pheno = pheno[(pheno.val==pheno.val)[:,0],:]
-    covar = _pheno_fixup(covar, iid_if_none=pheno.iid)
+    covar = _pheno_fixup(covar, iid_if_none=pheno.iid, count_A1=count_A1)
 
     if not leave_out_one_chrom:
         assert covar_by_chrom is None, "When 'leave_out_one_chrom' is False, 'covar_by_chrom' must be None"
-        K0 = _kernel_fixup(K0 or G0 or test_snps, iid_if_none=test_snps.iid, standardizer=Unit())
-        K1 = _kernel_fixup(K1 or G1, iid_if_none=test_snps.iid, standardizer=Unit())
+        K0 = _kernel_fixup(K0 or G0 or test_snps, iid_if_none=test_snps.iid, standardizer=Unit(),count_A1=count_A1)
+        K1 = _kernel_fixup(K1 or G1, iid_if_none=test_snps.iid, standardizer=Unit(),count_A1=count_A1)
         K0, K1, test_snps, pheno, covar  = pstutil.intersect_apply([K0, K1, test_snps, pheno, covar])
         logging.debug("# of iids now {0}".format(K0.iid_count))
         K0, K1, block_size = _set_block_size(K0, K1, mixing, GB_goal, force_full_rank, force_low_rank)
@@ -579,7 +580,7 @@ def _internal_single(K0, test_snps, pheno, covar, K1,
         return test_snps.sid_count * work_index // work_count
 
     def mapper_closure(work_index):
-        if work_count > 1: logging.info("single_snp: Working on part {0} of {1}".format(work_index,work_count))
+        if work_count > 1: logging.info("single_snp: Working on snp block {0} of {1}".format(work_index,work_count))
         do_work_time = time.time()
         start = debatch_closure(work_index)
         end = debatch_closure(work_index+1)

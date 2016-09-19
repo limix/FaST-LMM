@@ -179,9 +179,9 @@ class _SnpTrainTest(KernelReader):
         copier.input(self.train)
         copier.input(self.test)
         copier.input(self.standardizer)
-def _snps_fixup(snp_input, iid_if_none=None):
+def _snps_fixup(snp_input, iid_if_none=None,count_A1=None):
     if isinstance(snp_input, str):
-        return Bed(snp_input)
+        return Bed(snp_input,count_A1=count_A1)
 
     if isinstance(snp_input, dict):
         return SnpData(iid=snp_input['iid'],sid=snp_input['header'],val=snp_input['vals'])
@@ -192,16 +192,16 @@ def _snps_fixup(snp_input, iid_if_none=None):
 
     return snp_input
 
-def _pheno_fixup(pheno_input, iid_if_none=None, missing ='NaN'):
+def _pheno_fixup(pheno_input, iid_if_none=None, missing ='NaN',count_A1=None):
 
     try:
         ret = Pheno(pheno_input, iid_if_none, missing=missing)
         ret.iid #doing this just to force file load
         return ret
     except:
-        return _snps_fixup(pheno_input, iid_if_none=iid_if_none)
+        return _snps_fixup(pheno_input, iid_if_none=iid_if_none,count_A1=count_A1)
 
-def _kernel_fixup(input, iid_if_none, standardizer, test=None, test_iid_if_none=None, block_size=None, train_snps=None):
+def _kernel_fixup(input, iid_if_none, standardizer, test=None, test_iid_if_none=None, block_size=None, train_snps=None, count_A1=None):
     if test is not None and input is None:
         input = test
         test = None
@@ -210,9 +210,9 @@ def _kernel_fixup(input, iid_if_none, standardizer, test=None, test_iid_if_none=
         return KernelNpz(input)
 
     if isinstance(input, str):
-        input = Bed(input)     #Note that we don't return here. Processing continues
+        input = Bed(input, count_A1=count_A1)     #Note that we don't return here. Processing continues
     if isinstance(test, str):
-        test = Bed(test)      #Note that we don't return here. Processing continues
+        test = Bed(test, count_A1=count_A1)      #Note that we don't return here. Processing continues
 
     if isinstance(input,SnpReader):
         if test is not None:
