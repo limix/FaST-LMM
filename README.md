@@ -10,8 +10,9 @@ Our documentation (including live examples) is also available as ipython noteboo
 * Heritability with Spatial Correction: https://github.com/MicrosoftGenomics/FaST-LMM/blob/master/doc/ipynb/heritability_si.ipynb
 
 Additionally, API documentation is available:
-http://research.microsoft.com/en-us/um/redmond/projects/MSCompBio/Fastlmm/api/
+http://microsoftgenomics.github.io/FaST-LMM/
 
+A C++ version, which is generally less functional, is available at http://research.microsoft.com/en-us/downloads/30260656-0f99-4ae0-b7ce-08157b50d4d9/
 
 ### Quick install:
 
