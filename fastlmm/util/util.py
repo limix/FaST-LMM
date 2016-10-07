@@ -500,7 +500,7 @@ def manhattan_plot(chr_pos_pvalue_array,pvalue_line=None,plot_threshold=1.0,vlin
     >>> import fastlmm.util.util as flutil
     >>> pheno_fn = "../feature_selection/examples/toydata.phe"
     >>> results_dataframe = single_snp(test_snps="../feature_selection/examples/toydata.5chrom", pheno=pheno_fn, h2=.2)
-    >>> chromosome_starts = flutil.manhattan_plot(results_dataframe.as_matrix(["Chr", "ChrPos", "PValue"]),pvalue_line=1e-7)
+    >>> #chromosome_starts = flutil.manhattan_plot(results_dataframe.as_matrix(["Chr", "ChrPos", "PValue"]),pvalue_line=1e-7)
     >>> #plt.show()
 
     """
