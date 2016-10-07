@@ -1,7 +1,4 @@
-import scipy as sp
 import numpy as np
-import scipy.stats as st
-import pdb
 import warnings
 import logging
 import sys
@@ -34,8 +31,8 @@ def compare_files(file1,file2,tol=1e-8,delimiter="\t"):
     Returns: val,msg 
     where val is True/False (true means files to compare to each other) and a msg for the failure.
     '''
-    dat1=sp.loadtxt(file1,dtype='str',delimiter=delimiter,comments=None)
-    dat2=sp.loadtxt(file2,dtype='str',delimiter=delimiter,comments=None)
+    dat1=np.loadtxt(file1,dtype='str',delimiter=delimiter,comments=None)
+    dat2=np.loadtxt(file2,dtype='str',delimiter=delimiter,comments=None)
 
     ncol1=dat1[0].size
     ncol2=dat2[0].size
@@ -48,9 +45,9 @@ def compare_files(file1,file2,tol=1e-8,delimiter="\t"):
         head2=dat2[0,:]
     except:
         #file contains just a single column.
-        return sp.all(dat1==dat2), "single column result doesn't match exactly ('{0}')".format(file1)
+        return np.all(dat1==dat2), "single column result doesn't match exactly ('{0}')".format(file1)
     #logging.warn("DO headers match up? (file='{0}', '{1}' =?= '{2}')".format(file1, head1,head2))
-    if not sp.all(head1==head2):         
+    if not np.all(head1==head2):         
         return False, "headers do not match up (file='{0}', '{1}' =?= '{2}')".format(file1, head1,head2)
         
     for c in range(ncol1):
@@ -59,19 +56,19 @@ def compare_files(file1,file2,tol=1e-8,delimiter="\t"):
         col2=dat2[1:,c]        
         try:
             #if it is numeric
-            col1=sp.array(col1,dtype='float64')
-            col2=sp.array(col2,dtype='float64')                    
+            col1=np.array(col1,dtype='float64')
+            col2=np.array(col2,dtype='float64')                    
         except Exception:
             # if it is a string
             pass
-            if not sp.all(col1==col2):     
+            if not np.all(col1==col2):     
                 return False, "string column %s does not match" % head1[c]
             checked=True
 
         #if it is numeric
         if not checked:
-            absdiff=sp.absolute(col1-col2)
-            if sp.any(absdiff>tol):
+            absdiff=np.absolute(col1-col2)
+            if np.any(absdiff>tol):
                 try:                
                     return False, "numeric column %s does diff of %e not match within tolerance %e" % (head1[c],max(absdiff),  tol)
                 except:
@@ -85,8 +82,8 @@ def compare_mixed_files(file1,file2,tol=1e-8,delimiter="\t"):
     Returns: val,msg 
     where val is True/False (true means files to compare to each other) and a msg for the failure.
     '''
-    dat1=sp.loadtxt(file1,dtype='str',delimiter=delimiter,comments=None)
-    dat2=sp.loadtxt(file2,dtype='str',delimiter=delimiter,comments=None)
+    dat1=np.loadtxt(file1,dtype='str',delimiter=delimiter,comments=None)
+    dat2=np.loadtxt(file2,dtype='str',delimiter=delimiter,comments=None)
 
     ncol1=dat1[0].size
     ncol2=dat2[0].size
@@ -99,7 +96,7 @@ def compare_mixed_files(file1,file2,tol=1e-8,delimiter="\t"):
         c_count = dat1.shape[1]
     except:
         #file contains just a single column.
-        return sp.all(dat1==dat2), "single column result doesn't match exactly ('{0}')".format(file1)
+        return np.all(dat1==dat2), "single column result doesn't match exactly ('{0}')".format(file1)
 
     for r in xrange(r_count):
         for c in xrange(c_count):
@@ -177,17 +174,17 @@ def standardize_col(dat,meanonly=False):
     else:
         colstd=None
     ncol=dat.shape[1]           
-    nmissing=sp.zeros((ncol))    
-    datimp=sp.empty_like(dat); datimp[:]=dat
-    for c in sp.arange(0,ncol):        
-        datimp[sp.isnan(datimp[:,c]),c]=colmean[c] 
+    nmissing=np.zeros((ncol))    
+    datimp=np.empty_like(dat); datimp[:]=dat
+    for c in np.arange(0,ncol):        
+        datimp[np.isnan(datimp[:,c]),c]=colmean[c] 
         datimp[:,c]=datimp[:,c]-colmean[c]        
         if not meanonly:
             if colstd[c]>1e-6:
                 datimp[:,c]=datimp[:,c]/colstd[c]
             else:
                 print "warning: colstd=" + colstd[c] + " during normalization"
-        nmissing[c]=float(sp.isnan(dat[:,c]).sum())
+        nmissing[c]=float(np.isnan(dat[:,c]).sum())
     fracmissing=nmissing/dat.shape[0]         
     return datimp,fracmissing
 
@@ -196,7 +193,7 @@ def extractcols(filein,colnameset=None,dtypeset=None):
     import pandas as pd          
     data=pd.read_csv(filein,delimiter = '\t',dtype=dtypeset,usecols=colnameset)    
     r={}
-    for j in sp.arange(0,len(colnameset)):
+    for j in np.arange(0,len(colnameset)):
         name=colnameset.pop()
         r[name]=(data[name].values)
     return r
@@ -214,7 +211,7 @@ def argintersect_left(a, b):
     the indices of elements of a, which are in intersect of a and b
     ----------------------------------------------------------------------
     """
-    return sp.arange(a.shape[0])[sp.in1d(a,b)]
+    return np.arange(a.shape[0])[np.in1d(a,b)]
 
 
 def intersect_ids(idslist,sep="Q_Q"):
@@ -232,7 +229,7 @@ def intersect_ids(idslist,sep="Q_Q"):
     #!!warnings.warn("This intersect_ids is deprecated. Pysnptools includes newer versions of intersect_ids", DeprecationWarning)
     id2ind={}    
     L=len(idslist)
-    observed=sp.zeros(L,dtype='bool')
+    observed=np.zeros(L,dtype='bool')
 
     for l, id_list in enumerate(idslist):
             if id_list is not None:
@@ -243,7 +240,7 @@ def intersect_ids(idslist,sep="Q_Q"):
                     else:
                         for i in xrange(id_list.shape[0]):
                             id=id_list[i,0] +sep+ id_list[i,1]
-                            entry=sp.zeros(L)*sp.nan #id_list to contain the index for this id, for all lists provided
+                            entry=np.zeros(L)*np.nan #id_list to contain the index for this id, for all lists provided
                             entry[l]=i                 #index for the first one
                             id2ind[id]=entry
                 elif observed[l]:
@@ -252,11 +249,11 @@ def intersect_ids(idslist,sep="Q_Q"):
                         if id2ind.has_key(id):
                             id2ind[id][l]=i
 
-    indarr=sp.array(id2ind.values(),dtype='float')  #need float because may contain NaNs
+    indarr=np.array(id2ind.values(),dtype='float')  #need float because may contain NaNs
     indarr[:,~observed]=-1                          #replace all Nan's from empty lists to -1
-    inan = sp.isnan(indarr).any(1)                  #find any rows that contain at least one Nan
+    inan = np.isnan(indarr).any(1)                  #find any rows that contain at least one Nan
     indarr=indarr[~inan]                            #keep only rows that are not NaN
-    indarr=sp.array(indarr,dtype='int')             #convert to int so can slice 
+    indarr=np.array(indarr,dtype='int')             #convert to int so can slice 
     return indarr
 
 def indof_constfeatures(X,axis=0):
@@ -264,8 +261,8 @@ def indof_constfeatures(X,axis=0):
     Assumes features are columns (by default, but can do rows), and checks to see if all features are simply constants,
     such that it is equivalent to a bias and nothing else
     '''
-    featvar=sp.var(X,axis=axis)
-    badind = sp.nonzero(featvar==0)[0]
+    featvar=np.var(X,axis=axis)
+    badind = np.nonzero(featvar==0)[0]
     return badind
 
 def constfeatures(X,axis=0):
@@ -273,7 +270,7 @@ def constfeatures(X,axis=0):
     Assumes features are columns (by default, but can do rows), and checks to see if all features are simply constants,
     such that it is equivalent to a bias and nothing else
     '''
-    featmeans=sp.mean(X,axis=axis)
+    featmeans=np.mean(X,axis=axis)
     return (X-featmeans==0).all()
 
 
@@ -297,7 +294,7 @@ def datestamp(appendrandom=False):
 
 #not needed, just use the sp RandomState.permutation
 #def permute(numbersamples):
-#    perm = sp.random.permutation(numbersamples)
+#    perm = np.random.permutation(numbersamples)
 #    return perm
 
 #Not needed because enumerate is built in to the language
@@ -401,16 +398,16 @@ def excludeinds(pos0, pos1, mindist = 10.0,idist = 2):
                   (True: exclude, False: do not exclude)
     --------------------------------------------------------------------------
     '''
-    chromosomes1 = sp.unique(pos1[:,0])
-    i_exclude = sp.zeros(pos0[:,0].shape[0],dtype = 'bool')
+    chromosomes1 = np.unique(pos1[:,0])
+    i_exclude = np.zeros(pos0[:,0].shape[0],dtype = 'bool')
     if (mindist>=0.0):
         for ichr in xrange(chromosomes1.shape[0]):
             i_SNPs1_chr=pos1[:,0] == chromosomes1[ichr]
             i_SNPs0_chr=pos0[:,0] == chromosomes1[ichr]
             pos1_ = pos1[i_SNPs1_chr,idist]
             pos0_ = pos0[i_SNPs0_chr,idist]
-            distmatrix = pos1_[sp.newaxis,:] - pos0_[:,sp.newaxis]
-            i_exclude[i_SNPs0_chr] = (sp.absolute(distmatrix)<=mindist).any(1)
+            distmatrix = pos1_[np.newaxis,:] - pos0_[:,np.newaxis]
+            i_exclude[i_SNPs0_chr] = (np.absolute(distmatrix)<=mindist).any(1)
     return i_exclude
 
 
