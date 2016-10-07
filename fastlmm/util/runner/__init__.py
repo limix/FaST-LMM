@@ -403,4 +403,3 @@ from .Hadoop2 import *
 from .LocalMapper import *
 from .LocalReducer import *
 from .localfromranges import *
-from .AzureBatch import *

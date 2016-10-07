@@ -6,9 +6,9 @@
     <ProjectGuid>6d8dcdf9-3776-4e1b-a713-e9b6f2a49865</ProjectGuid>
     <ProjectHome>
     </ProjectHome>
-    <StartupFile>tests\test_fastlmm_predictor.py</StartupFile>
+    <StartupFile>fastlmm_predictor.py</StartupFile>
     <SearchPath>..\..;..\..\..\pysnptools</SearchPath>
-    <WorkingDirectory>.</WorkingDirectory>
+    <WorkingDirectory>c:\source\carlk\fastlmm\doc\ipynb</WorkingDirectory>
     <OutputPath>.</OutputPath>
     <InterpreterId>00000000-0000-0000-0000-000000000000</InterpreterId>
     <InterpreterVersion>
@@ -21,6 +21,7 @@
     <SccLocalPath>SAK</SccLocalPath>
     <LaunchProvider>Standard Python launcher</LaunchProvider>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
+    <IsWindowsApplication>False</IsWindowsApplication>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>

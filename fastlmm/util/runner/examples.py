@@ -1,6 +1,6 @@
 import math
 from fastlmm.util.mapreduce import map_reduce
-from fastlmm.util.runner import Local, LocalMultiProc, HPC, AzureBatch, LocalMultiThread
+from fastlmm.util.runner import Local, LocalMultiProc, HPC, LocalMultiThread
 import os
 
 def is_prime(n):
@@ -64,7 +64,6 @@ if __name__ == '__main__':
     #                                        nodegroups="Preemptable",
     #                                        runtime="0:11:0", # day:hour:min
     #                                        )
-    #runner=AzureBatch(2,update_python_path=False)
     #runner=LocalMultiProc(2,just_one_process=False)
     #runner = Local()
     runner = LocalMultiThread(2,just_one_process=False)

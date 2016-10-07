@@ -62,6 +62,7 @@ class _SnpWholeTest(KernelReader):
         if row_index_or_none is None:
             row_index_or_none = range(self.row_count)
 
+        assert not isinstance(row_index_or_none,str), "row_index_or_none should not be a string"
         iid = self.row[row_index_or_none]
 
         if col_index_or_none is None or np.array_equal(col_index_or_none,range(self.col_count)):
@@ -556,4 +557,3 @@ if __name__ == "__main__":
 
     import doctest
     doctest.testmod()
-

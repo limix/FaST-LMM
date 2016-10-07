@@ -920,7 +920,7 @@ class FastLmmSet: # implements IDistributable
 
         phenhead,phentail=os.path.split(self.phenofile)
         logging.info("Reading Pheno: " +  phentail + "")        
-        pheno = loadPhen(filename = self.phenofile)     
+        pheno = loadPhen(filename = self.phenofile,missing='NaN')
         pheno['vals']=pheno['vals'][:,self.mpheno-1]#use -1 so compatible with C++ version
         #pheno['header']=pheno['header'][self.mpheno-1] #header is empty 
         goodind=sp.logical_not(sp.isnan(pheno['vals']))
@@ -949,7 +949,7 @@ class FastLmmSet: # implements IDistributable
         if self.covarfile==None:
             covar=None
         else:
-            covar=loadPhen(self.covarfile)
+            covar=loadPhen(self.covarfile,missing='NaN')
             if self.covarimp=='standardize':
                 covar['vals'],fracmissing=utilx.standardize_col(covar['vals'])
             elif self.covarimp is None:

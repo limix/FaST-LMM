@@ -7,7 +7,7 @@ from fastlmm.external.pca import PCA
 from pysnptools.snpreader import Bed
 
 
-def compute_auto_pcs(snpreader, cutoff=.1, k_values=np.arange(11), output_file_name=None):
+def compute_auto_pcs(snpreader, cutoff=.1, k_values=np.arange(11), output_file_name=None,count_A1=None):
     """
     Function automatically finds the best principle components (PCs)
 
@@ -21,6 +21,10 @@ def compute_auto_pcs(snpreader, cutoff=.1, k_values=np.arange(11), output_file_n
 
     :param k_values: (default: 0 ... 10 [inclusive]) The number of PCs to search.
     :type k_values: list of integers
+
+    :param count_A1: If it needs to read SNP data from a BED-formatted file, tells if it should count the number of A1
+         alleles (the PLINK standard) or the number of A2 alleles. False is the current default, but in the future the default will change to True.
+    :type count_A1: bool
 
     :rtype: A phenotype dictionary with property 'iid' listing the iids and property 'vals' containing a nparray of PC values.
 
@@ -37,7 +41,7 @@ def compute_auto_pcs(snpreader, cutoff=.1, k_values=np.arange(11), output_file_n
     """
     #!!could use regression tests beyond the docttest
 
-    snpreader = _snp_fixup(snpreader)
+    snpreader = _snp_fixup(snpreader,count_A1=count_A1)
 
     logging.info("reading all_std_snpdata")
     all_std_snpdata = snpreader.read().standardize() #!!could doing C or F be better?
@@ -122,9 +126,9 @@ def compute_auto_pcs(snpreader, cutoff=.1, k_values=np.arange(11), output_file_n
     result = {'iid':sp.array(snpreader.iid),'vals':X_fit, 'header':["pc_{0}".format(index) for index in xrange(bestNumPCs)]}
     return result
 
-def _snp_fixup(snp_input):
+def _snp_fixup(snp_input, count_A1=None):
     if isinstance(snp_input, str):
-        return Bed(snp_input)
+        return Bed(snp_input,count_A1=count_A1)
     else:
         return snp_input
 
@@ -132,17 +136,3 @@ def _snp_fixup(snp_input):
 if __name__ == "__main__":
     import doctest
     doctest.testmod()
-
-    import logging
-    from pysnptools.snpreader import Bed
-    from fastlmm.util import compute_auto_pcs
-    logging.basicConfig(level=logging.INFO)
-    #file_name = "../../tests/datasets/mouse/alldata"
-    file_name = "../feature_selection/examples/toydata"
-    #file_name = r"c:\deldir\N4000S50000c500h0.50s0.00p0.50F0.0050FH0.2000v0.30_3"
-    result = compute_auto_pcs(file_name)
-    #print result
-
-
-    print "done"
-

@@ -326,3 +326,5 @@ tests/tmp_extract_sim.txt
 /doc/ipynb/oldFaSTLMMScale.ipynb
 /doc/ipynb/oldFaSTLMMScale-Copy1.ipynb
 /doc/ipynb/del.azurebed.npz
+/tests/tmp
+/tests/pcs_cov.txt

@@ -19,7 +19,7 @@ import logging
 import fastlmm.util.util as ut
 import fastlmm.pyplink.plink as plink
 from fastlmm.util.distributabletest import DistributableTest
-from fastlmm.util.runner import Local, Hadoop, Hadoop2, HPC, LocalMultiProc, LocalInParts, AzureBatch
+from fastlmm.util.runner import Local, Hadoop, Hadoop2, HPC, LocalMultiProc, LocalInParts
 
 tolerance = 1e-4
 
@@ -193,10 +193,6 @@ if __name__ == '__main__':
         #runner = LocalMultiProc(taskcount=1,mkl_num_threads=5,just_one_process=False)
         #runner = LocalInParts(1,2,mkl_num_threads=1) # For debugging the cluster runs
         #runner = Hadoop2(100, mapmemory=8*1024, reducememory=8*1024, mkl_num_threads=1, queue="default")
-        #runner = AzureBatch(task_count=74,min_node_count=2,max_node_count=7,pool_id="twoa2x2")
-
-        #runner = AzureBatch(task_count=75,min_node_count=2,max_node_count=7,pool_id="twoa2x2")
-        #runner = AzureBatch(task_count=75,min_node_count=2,max_node_count=10,pool_id="a4x1")
         for i in xrange(10):
             print runner.run(distributable_test)
 

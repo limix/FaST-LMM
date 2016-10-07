@@ -116,7 +116,8 @@ def single_snp(test_snps, pheno, K0=None,
         If not given, the function is run locally.
     :type runner: a runner.
 
-    :param count_A1: Tells if it should count the number of A1 alleles (the PLINK standard) or the number of A2 alleles. False is the current default, but in the future the default will change to True.
+    :param count_A1: If it needs to read SNP data from a BED-formatted file, tells if it should count the number of A1
+         alleles (the PLINK standard) or the number of A2 alleles. False is the current default, but in the future the default will change to True.
     :type count_A1: bool
 
 
@@ -167,7 +168,7 @@ def single_snp(test_snps, pheno, K0=None,
         assert sid_index_range == (0,test_snps.sid_count), "Some SNP rows are missing from the output"
     else: 
         chrom_list = list(set(test_snps.pos[:,0])) # find the set of all chroms mentioned in test_snps, the main testing data
-        assert not np.isnan(chrom_list), "chrom list should not contain NaN"
+        assert not np.isnan(chrom_list).any(), "chrom list should not contain NaN"
         input_files = [test_snps, pheno, K0, G0, K1, G1, covar] + ([] if covar_by_chrom is None else covar_by_chrom.values())
 
         def nested_closure(chrom):
