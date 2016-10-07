@@ -328,3 +328,5 @@ tests/tmp_extract_sim.txt
 /doc/ipynb/del.azurebed.npz
 /tests/tmp
 /tests/pcs_cov.txt
+/doc/ipynb/FaST-LMM.ipynb.orig
+/fastlmm/util/util.py.orig
