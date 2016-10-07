@@ -213,7 +213,6 @@ class HPC: # implements IRunner
                                 batfilename_rel[0:-8]+"noderelease.bat", #19
                                 1 if self.node_local else 0,             #20
                                 "",                                      #21 always run release task
-                                ###!!!cmk delete this line#"" if self.clean_up else "#",            #21 if clean_up is false, comment out node release tasks
                                 self.preemptable,                        #22
                                 self.FailOnTaskFailure,
                                 ))
@@ -337,7 +336,7 @@ class HPC: # implements IRunner
         return batfilename_rel
 
     def check_remote_pythoninstall(self):
-        remotepythoninstall = self.fileshare + os.path.sep + "pythonInstallC" #!!!cmk don't hardwire this
+        remotepythoninstall = self.fileshare + os.path.sep + "pythonInstallC" #!!! don't hardwire this
         if not os.path.isdir(remotepythoninstall): raise Exception("Expect Python and related directories at '{0}'".format(remotepythoninstall))
 
         return remotepythoninstall

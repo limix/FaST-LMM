@@ -273,8 +273,8 @@ class FastLMM(object):
         self.kernel_standardizer = kernel_standardizer
         self.is_fitted = False
 
-
-    def fit(self, X=None, y=None, K0_train=None, K1_train=None, h2raw=None, mixing=None):#!!!cmk is this h2 or h2corr????
+    #!!!update doc to explain h2raw w.r.t h2
+    def fit(self, X=None, y=None, K0_train=None, K1_train=None, h2raw=None, mixing=None):#!!!is this h2 or h2corr????
         """
         Method for training a :class:`FastLMM` predictor. If the examples in X, y, K0_train, K1_train are not the same, they will be reordered and intersected.
 
@@ -296,7 +296,7 @@ class FastLMM(object):
                Can be PySnpTools :class:`.KernelReader`. If you give a string it can be the name of a :class:`.KernelNpz` file.
         :type K1_train: :class:`.SnpReader` or a string or :class:`.KernelReader`
 
-        :param h2raw: A parameter to LMM learning that tells how much weight to give the K's vs. the identity matrix, optional #!!!cmk update doc to explain h2raw w.r.t h2
+        :param h2raw: A parameter to LMM learning that tells how much weight to give the K's vs. the identity matrix, optional 
                 If not given will search for best value.
                 If mixing is unspecified, then h2 must also be unspecified.
         :type h2raw: number
@@ -454,7 +454,7 @@ class FastLMM(object):
                     result.val[iid_index,0] = nll
                 return result
             else:
-               raise Exception("!!!cmk need code for mse_too")                                  
+               raise Exception("need code for mse_too")                                  
 
 
     def _extract_fixup(kernel):

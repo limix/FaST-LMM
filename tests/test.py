@@ -167,26 +167,6 @@ if __name__ == '__main__':
                                     fastlmm.inference.tests.test_linear_regression.getTestSuite(),
                                     ])
 
-    suites_cmk = unittest.TestSuite([
-                                    #out4 fastlmm.util.test.getTestSuite(),
-                                    tests.test.getTestSuite(), #out3
-                                    #out5 fastlmm.inference.tests.test.getTestSuite(),#out3
-                                    #out5 fastlmm.association.tests.test_single_snp.getTestSuite(),#out3
-                                    #out2 fastlmm.association.tests.test_single_snp_linreg.getTestSuite(),
-                                    #out2 fastlmm.association.tests.test_single_snp_all_plus_select.getTestSuite(),
-                                    #out2 fastlmm.association.tests.test_single_snp_select.getTestSuite(),
-                                    #out2 fastlmm.association.tests.testepistasis.getTestSuite(),
-                                    #out2 fastlmm.association.tests.test_snp_set.getTestSuite(),
-                                    #out2 fastlmm.inference.tests.test.getTestSuite(),
-
-                                    #out1 fastlmm.association.tests.test_gwas.getTestSuite(),
-                                    #out1 fastlmm.util.testdistributable.getTestSuite(),
-                                    #out1 fastlmm.feature_selection.test.getTestSuite(),
-                                    #out1 fastlmm.association.tests.test_heritability_spatial_correction.getTestSuite(),
-                                    #out1 fastlmm.inference.tests.test_fastlmm_predictor.getTestSuite(),
-                                    #out1 fastlmm.inference.tests.test_linear_regression.getTestSuite(),
-                                    ])
-    
     
     if True: #Standard test run
         r = unittest.TextTestRunner(failfast=False)
@@ -214,11 +194,9 @@ if __name__ == '__main__':
         #runner = LocalInParts(1,2,mkl_num_threads=1) # For debugging the cluster runs
         #runner = Hadoop2(100, mapmemory=8*1024, reducememory=8*1024, mkl_num_threads=1, queue="default")
         #runner = AzureBatch(task_count=74,min_node_count=2,max_node_count=7,pool_id="twoa2x2")
-        #!!!cmk also if task_count for AzureBatch is > 99, it fails with an error message that is hard to understand.
 
         #runner = AzureBatch(task_count=75,min_node_count=2,max_node_count=7,pool_id="twoa2x2")
         #runner = AzureBatch(task_count=75,min_node_count=2,max_node_count=10,pool_id="a4x1")
-        distributable_test = DistributableTest(suites_cmk,"temp_test")
         for i in xrange(10):
             print runner.run(distributable_test)
 

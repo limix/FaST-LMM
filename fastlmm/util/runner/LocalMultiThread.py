@@ -17,7 +17,7 @@ import threading
 import fastlmm.util.util as util
 from Queue import PriorityQueue
 
-class LocalMultiThread: # implements IRunner #!!!cmk move to its own file
+class LocalMultiThread: # implements IRunner
     '''Designed so that reduce will start running as soon as the 1st task as finished
     '''
 

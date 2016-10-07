@@ -3,7 +3,7 @@ import logging
 import unittest
 import cStringIO
 
-class DistributableTest(object) : #implements IDistributable #!!!cmk needs to implement .name
+class DistributableTest(object) : #implements IDistributable
     '''
     This is a class for distributing any testing. It shouldn't be confused with TestDistributable which is a class for
     testing the distributable classes.
@@ -11,6 +11,7 @@ class DistributableTest(object) : #implements IDistributable #!!!cmk needs to im
     def __init__(self,test_or_suite,tempdirectory=None):
         self._test_or_suite = test_or_suite
         self.__tempdirectory = tempdirectory
+        self.name = str(test_or_suite)
 
     @staticmethod
     def deep_iter(test_or_suite):
@@ -26,15 +27,10 @@ class DistributableTest(object) : #implements IDistributable #!!!cmk needs to im
         ###############test_result = unittest.TestResult()
         r = unittest.TextTestRunner(failfast=False)
         logging.info(test)
-        logging.info("!!!cmk z0")
         test.setUpClass()
-        logging.info("!!!cmk z")
         test_result = r.run(test)
         ##############test.run(result=test_result)
         test.tearDownClass()
-        #!!!cmktest_result._original_stdout = None
-        ##!!!cmktest_result._original_stderr = None
-        ##!!!cmktest_result.stream = None
         return test_result
 
  #start of IDistributable interface--------------------------------------

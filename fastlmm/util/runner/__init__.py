@@ -121,7 +121,7 @@ def work_sequence_from_disk(workdirectory, taskAndWorkcount):
                 result = cPickle.load(f)
             except Exception, detail:
                 raise Exception("Error trying to unpickle '{0}'. {1}".format(task_file_name,detail))
-        if True: #!!!cmk0 taskindex % 100 == 0:
+        if True:
             logging.debug("\tAbout to yield result {0} of {1}".format(taskindex,taskAndWorkcount))
         yield result
 
