@@ -171,9 +171,9 @@ def standardize_col(dat,meanonly=False):
     '''
     Mean impute each columns of an array.
     '''           
-    colmean=st.nanmean(dat)
+    colmean=np.nanmean(dat)
     if ~meanonly:
-        colstd=st.nanstd(dat)
+        colstd=np.nanstd(dat)
     else:
         colstd=None
     ncol=dat.shape[1]           

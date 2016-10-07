@@ -30,14 +30,15 @@ class Bed(object):
     This is a class that does random-access reads of a BED file. For examples of its use see its 'read' method.
     '''
 
-    _ran_once = False
-    _filepointer = None
 
     def __init__(self,basefilename):
         '''
         basefilename    : string of the basename of [basename].bed, [basename].bim,
                           and [basename].fam
         '''
+
+        self._ran_once = False
+        self._filepointer = None
 
         self.basefilename = basefilename
 

@@ -13,10 +13,11 @@ from fastlmm.pyplink.altset_list import *
 
 class Hdf5(object):
 
-    _ran_once = False
-    h5 = None
 
     def __init__(self,filename, order = 'F',blocksize=5000):
+        self._ran_once = False
+        self.h5 = None
+
         ##!! copy relevent comments from Bed reader
         self.filename=filename
         self.order = order

@@ -30,43 +30,6 @@ class FastLmmSet: # implements IDistributable
     A class for specifying a FastLmmSet and then running it.
     '''
 
-    # member variables with default values, or those not defined in the input file    
-    mpheno=1
-    mindist = 2.0
-    idist=1
-    autoselect = True
-    extractSim = None
-    nperm = 10 # used to permute the data in order to get empirical distrib of null for param fitting of null; these are global
-    npermabs = None #used instead of nperm to compute an at least this many permutations (I say at least because it is # of perms per test)
-    cache_from_perm=False #If true, then actually does the permutations with the real, all in run_test() so can cache expensive things
-    nlocalperm=None #same as nperm, but local to each test (doesn't do pooling)
-    fitlocal=False #if true, fit aUD to each local set
-    write_lrtperm = False  #when set to True, writes a third file containing only the p-values resulting from nperm
-    nullfitfile = None   #file from which to grab the null stats from. should be generated using write_lrtperm
-    calseed = None# was 0 # the int that gets added to the random seed 34343 used to generate permutations for lrt null fitting
-    sets=None
-    permute=None       # permute the SNPs being tested (or, equivalently, the compliment) using this with 1,2,3,4, etc. for different seeds, used for type I error tables
-    forcefullrank = False
-    nullfit="qq"       #alternative is "ml"    
-    qmax=0.1
-    minsetsize = 1
-    maxsetsize = 10000000
-    datestamp = None #use auto to have it auto-generate a date stamp
-    covarimp = 'standardize' #use 'standardize' for mean and variance standardization, with mean imputation
-    altset_list2=None#for doing pairs of sets
-    nullModel = None
-    altModel = None
-    genphen=None#MUST LEAVE THIS AS THE DEFAULT#{"varE":1.0,"varG":1.0, "varBack":1.0,"varCov":1.0,"link":'linear',"casefrac":0.5,"once":false}      #generate synthetic phen, using LMM, and real SNPs
-       
-    scoring = None
-    greater_is_better = None
-    log = None
-    detailed_table = False
-    signal_ratio = True
-
-    _synthphenfile=None
-
-    alt_snpreader = None
 
     def addpostifx_to_outfile(self):
         if self.datestamp is not None:
@@ -110,6 +73,46 @@ class FastLmmSet: # implements IDistributable
                           to append to filenames. Otherwise, it appends whatever you set it to.
         log             : (Defaults to not changing logging level) Level of log messages, e.g. logging.CRITICAL, logging.ERROR, logging.WARNING, logging.INFO
         '''
+
+        # member variables with default values, or those not defined in the input file    
+        self.mpheno=1
+        self.mindist = 2.0
+        self.idist=1
+        self.autoselect = True
+        self.extractSim = None
+        self.nperm = 10 # used to permute the data in order to get empirical distrib of null for param fitting of null; these are global
+        self.npermabs = None #used instead of nperm to compute an at least this many permutations (I say at least because it is # of perms per test)
+        self.cache_from_perm=False #If true, then actually does the permutations with the real, all in run_test() so can cache expensive things
+        self.nlocalperm=None #same as nperm, but local to each test (doesn't do pooling)
+        self.fitlocal=False #if true, fit aUD to each local set
+        self.write_lrtperm = False  #when set to True, writes a third file containing only the p-values resulting from nperm
+        self.nullfitfile = None   #file from which to grab the null stats from. should be generated using write_lrtperm
+        self.calseed = None# was 0 # the int that gets added to the random seed 34343 used to generate permutations for lrt null fitting
+        self.sets=None
+        self.permute=None       # permute the SNPs being tested (or, equivalently, the compliment) using this with 1,2,3,4, etc. for different seeds, used for type I error tables
+        self.forcefullrank = False
+        self.nullfit="qq"       #alternative is "ml"    
+        self.qmax=0.1
+        self.minsetsize = 1
+        self.maxsetsize = 10000000
+        self.datestamp = None #use auto to have it auto-generate a date stamp
+        self.covarimp = 'standardize' #use 'standardize' for mean and variance standardization, with mean imputation
+        self.altset_list2=None#for doing pairs of sets
+        self.nullModel = None
+        self.altModel = None
+        self.genphen=None#MUST LEAVE THIS AS THE DEFAULT#{"varE":1.0,"varG":1.0, "varBack":1.0,"varCov":1.0,"link":'linear',"casefrac":0.5,"once":false}      #generate synthetic phen, using LMM, and real SNPs
+       
+        self.scoring = None
+        self.greater_is_better = None
+        self.log = None
+        self.detailed_table = False
+        self.signal_ratio = True
+
+        self._synthphenfile=None
+
+        self.alt_snpreader = None
+
+
         
         if hasattr(self,"ipheno"):
             assert not hasattr(self,"mpheno")

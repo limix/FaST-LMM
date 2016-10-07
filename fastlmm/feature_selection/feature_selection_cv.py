@@ -92,6 +92,7 @@ class FeatureSelectionStrategy(object):
         standardizer: a standandizer-like object such as Unit() or Beta(1,25), default=Unit()
 
         """
+        self._ran_once = False
  
         # data file names
         self.snpreader = snpreader
@@ -128,7 +129,6 @@ class FeatureSelectionStrategy(object):
             logger.setLevel(log)
 
 
-    _ran_once = False
     def run_once(self):
         if (self._ran_once):
             return
@@ -886,9 +886,7 @@ class InMemory(GClass):
         self._snpreader = snpreader
         self._standardizer = standardizer
         self._blocksize = blocksize
-
-
-    _val = None
+        self._val = None
 
     def __repr__(self):
         s = "InMemory({0},{1})".format(self._snpreader,self._standardizer)

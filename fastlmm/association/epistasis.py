@@ -122,6 +122,8 @@ class _Epistasis(object) : #implements IDistributable
 
     def __init__(self,test_snps,pheno,G0, G1=None, mixing=0.0, covar=None,sid_list_0=None,sid_list_1=None,
                  log_delta=None, min_log_delta=-5, max_log_delta=10, output_file=None, cache_file=None):
+        self._ran_once = False
+
         self.test_snps = test_snps
         self.pheno = pheno
         self.output_file_or_none = output_file
@@ -135,7 +137,6 @@ class _Epistasis(object) : #implements IDistributable
         self.external_log_delta=log_delta
         self.min_log_delta = min_log_delta
         self.max_log_delta = max_log_delta
-        self._ran_once = False
         self._str = "{0}({1},{2},G0={6},G1={7},mixing={8},covar={3},output_file={12},sid_list_0={4},sid_list_1{5},log_delta={9},min_log_delta={10},max_log_delta={11},cache_file={13})".format(
             self.__class__.__name__, self.test_snps,self.pheno,self.covar,self.sid_list_0,self.sid_list_1,
                  self.G0, self.G1_or_none, self.mixing, self.external_log_delta, self.min_log_delta, self.max_log_delta, output_file, cache_file)
