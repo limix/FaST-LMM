@@ -505,7 +505,7 @@ def manhattan_plot(chr_pos_pvalue_array,pvalue_line=None,plot_threshold=1.0,vlin
 
     """
     import matplotlib
-    # matplotlib.use('Agg') #This lets it work even on machines without graphics displays
+    matplotlib.use('Agg') #This lets it work even on machines without graphics displays
     import matplotlib.pyplot as plt
 
     # create a copy of the data and sort it by chrom and then position
