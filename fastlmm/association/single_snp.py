@@ -594,7 +594,7 @@ def _internal_single(K0, test_snps, pheno, covar, K1,
         chi2stats = beta*beta/res['variance_beta']
         #p_values = stats.chi2.sf(chi2stats,1)[:,0]
         assert test_snps.iid_count == lmm.U.shape[0]
-        p_values = stats.f.sf(chi2stats,1,lmm.U.shape[0]-3)[:,0]#note that G.shape is the number of individuals and 3 is the number of fixed effects (covariates+SNP)
+        p_values = stats.f.sf(chi2stats,1,lmm.U.shape[0]-lmm.linreg.D)[:,0]#note that G.shape is the number of individuals and 3 is the number of fixed effects (covariates+SNP)
 
         dataframe = _create_dataframe(snps_read.sid_count)
         dataframe['sid_index'] = np.arange(start,end)
