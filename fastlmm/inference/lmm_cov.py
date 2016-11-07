@@ -109,8 +109,9 @@ class LMM(object):
                 PxG = self.linreg.regress(Y=self.G)
                 try:
                     [self.U,self.S,V] = la.svd(PxG,False,True)
-                    if np.any(self.S < -0.1):
-                        logging.warning("kernel contains a negative Eigenvalue")
+                    # SVD is defined to be all positive in S, so the following will always be true (unless the SVD is buggy). 
+                    # if np.any(self.S < -0.1):
+                    #    logging.warning("kernel contains a negative Eigenvalue")
                     inonzero = self.S > 1E-10
                     self.S = self.S[inonzero]
                     self.S = self.S * self.S
@@ -552,24 +553,17 @@ class LMM(object):
         N = self.Y.shape[0] - self.linreg.D
         P = self.Y.shape[1]
         S,U = self.getSU()
-        k = S.shape[0]
+        k = S.shape[0]  # the rank of the data (or dof of the likelihood)
         if (h2 < 0.0) or (h2 + h2_1 >= 0.99999) or (h2_1 < 0.0):
             return {'nLL':3E20,
                     'h2':h2,
                     'h2_1':h2_1,
                     'scale':scale}
-        Sd = (h2 * self.S + (1.0 - h2 - h2_1)) * scale#?(1.0-h2-h2_1)?
-        #Sd = (h2*self.S + (1.0-h2))*scale#?(1.0-h2-h2_1)?
         denom = (1.0 - h2 - h2_1) * scale      # determine normalization factor
+        Sd = (h2 * self.S) * scale + denom
+        
         if subset: #if G1 is a complete subset of G, then we don't need to subtract and add separately
             h2_1 = h2_1 - h2
-
-        #UY,UUY = self.getUY()
-        #YKY = computeAKA(Sd=Sd, denom=denom, UA=UY, UUA=UUY)
-        #logdetK = np.log(Sd).sum()
-        #
-        #if (UUY is not None):#low rank part
-        #    logdetK+=(N-k) * np.log(denom)
         
         if UW is not None:
             weightW = np.zeros(UW.shape[1])
@@ -582,7 +576,6 @@ class LMM(object):
         if snps is not None:
             
             if snps.shape[0] != self.Y.shape[0]:
-                #pdb.set_trace()
                 print "shape mismatch between snps and Y"
             Usnps,UUsnps = self.rotate(A=snps)
         
@@ -668,11 +661,6 @@ class LMM(object):
                     'scale':scale}
         UY,UUY = self.getUY(idx_pheno = idx_pheno)
         P = UY.shape[1] #number of phenotypes used
-        # YKY = computeAKA(Sd=Sd, denom=denom, UA=UY, UUA=UUY)
-        # logdetK = np.log(Sd).sum()
-        #
-        # if (UUY is not None):#low rank part
-        #     logdetK+=(N - k) * np.log(denom)
 
         if (snps is not None) and (Usnps is None):
             assert snps.shape[0] == self.Y.shape[0], "shape missmatch between snps and Y"
@@ -741,7 +729,6 @@ class LMM(object):
             absw = np.absolute(weightW)
             weightW_nonz = absw > 1e-10
         if (UW is not None and weightW_nonz.any()):#low rank updates
-            #pdb.set_trace()
             multsign = False
             absw = np.sqrt(absw)
             signw = np.sign(weightW)
@@ -764,8 +751,6 @@ class LMM(object):
             num_exclude = UW.shape[1]
             
 
-            #WW = np.diag(1.0/weightW) + computeAKB(Sd=Sd, denom=denom, UA=UW, UUA=UUW,
-            #UB=UW, UUB=UUW)
             if multsign:
                 WW = np.eye(num_exclude) + computeAKB(Sd=Sd, denom=denom, UA=UW, UUA=UUW, UB=UW_, UUB=UUW_)
             else:
@@ -804,7 +789,7 @@ class LMM(object):
 
         if Usnps is not None:
             penalty_ = penalty or 0.0
-            assert (penalty_ >= 0.0), "penalty has to be positive"
+            assert (penalty_ >= 0.0), "penalty has to be non-negative"
             beta = snpsKY / (snpsKsnps + penalty_)
             if np.isnan(beta.min()):
                 logging.warning("NaN beta value seen, may be due to an SNC (a constant SNP)")
@@ -812,11 +797,11 @@ class LMM(object):
             variance_explained_beta = (snpsKY * beta)
             r2 = YKY[np.newaxis,:] - variance_explained_beta 
             if penalty:
-                variance_beta = r2 / (N - 1) * (snpsKsnps / ((snpsKsnps + penalty_) * (snpsKsnps + penalty_)))#note that we assume the loss in DOF is 1 here, even though it is less, so the
+                variance_beta = r2 / (N - 1.0) * (snpsKsnps / ((snpsKsnps + penalty_) * (snpsKsnps + penalty_)))#note that we assume the loss in DOF is 1 here, even though it is less, so the
                 #variance estimate is conservative, due to N-1 for penalty case
                 variance_explained_beta *= (snpsKsnps/(snpsKsnps+penalty_)) * (snpsKsnps/(snpsKsnps + penalty_))
             else:
-                variance_beta = r2 / (N - 1) / snpsKsnps
+                variance_beta = r2 / (N - 1.0) / snpsKsnps
                 fraction_variance_explained_beta = variance_explained_beta / YKY[np.newaxis,:] # variance explained by beta over total variance
         
         else:
@@ -871,10 +856,10 @@ class Linreg(object):
             self.beta = Y.mean(0)
         else:        
             if self.Xdagger is None:
-            	if self.X.shape[1]:
-                	self.Xdagger = la.pinv(self.X)       #SVD-based, and seems fast
+                if self.X.shape[1]:
+                    self.Xdagger = la.pinv(self.X)       #SVD-based, and seems fast
                 else:
-                	self.Xdagger = np.zeros_like(self.X.T)
+                    self.Xdagger = np.zeros_like(self.X.T)
             self.beta = self.Xdagger.dot(Y)
 
     def regress(self, Y):
@@ -927,14 +912,12 @@ def computeAKA(Sd, denom, UA, UUA=None):
 
 
 if 0:
-    import scipy as sp
-    import scipy.linalg as la
     N = 7
     D = 2
-    X = sp.randn(N,D)
+    X = np.randn(N,D)
 
-    X_K = sp.randn(N,N)
-    K = sp.dot(X_K,X_K.T) + sp.eye(N)
+    X_K = np.randn(N,N)
+    K = np.dot(X_K,X_K.T) + np.eye(N)
 
     Kinv = la.inv(K)
 
@@ -953,7 +936,7 @@ if 0:
 
     u = u[:,inonz]
     #s+=1
-    P__ = u.dot(sp.diag(1.0 / s)).dot(u.T)#matches with P
+    P__ = u.dot(np.diag(1.0 / s)).dot(u.T)#matches with P
     
     P___ = la.pinv(K_)#matches with P
 
@@ -1092,7 +1075,7 @@ if __name__ == "__main__":
         chi2stats = res['beta'] * res['beta'] / res['variance_beta']
         
         pv = st.chi2.sf(chi2stats,1)
-        pv_ = st.f.sf(chi2stats,1,G.shape[0] - 3)#note that G.shape is the number of individuals and 3 is the number of fixed
+        pv_ = st.f.sf(chi2stats,1,G.shape[0] - lmm.linreg.D)#note that G.shape is the number of individuals and 3 is the number of fixed
                                                  #effects (covariates+Snp)
         
         chi2stats2 = res2['beta'] * res2['beta'] / res2['variance_beta']
