@@ -1106,3 +1106,4 @@ if __name__ == "__main__":
             PL.plot(-np.log10(pv[gwas.p_idx,0]),-np.log10(gwas.p_values),'.g')
             
             PL.plot(-np.log10(pv),-np.log10(pv2),'.r')
+            
