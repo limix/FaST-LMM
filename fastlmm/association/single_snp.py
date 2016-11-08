@@ -29,11 +29,11 @@ from pysnptools.util.intrangeset import IntRangeSet
 from fastlmm.inference.fastlmm_predictor import _snps_fixup, _pheno_fixup, _kernel_fixup, _SnpTrainTest
 import fastlmm.inference.linear_regression as lin_reg
 
-#!!!cmk add documentation here and anywhere else that output_file_name is CSV format with tab delimiters
 def single_snp(test_snps, pheno, K0=None,
                  K1=None, mixing=None,
                  covar=None, covar_by_chrom=None, leave_out_one_chrom=True, output_file_name=None, h2=None, log_delta=None,
-                 cache_file = None, GB_goal=None, interact_with_snp=None, force_full_rank=False, force_low_rank=False, G0=None, G1=None, runner=None):
+                 cache_file = None, GB_goal=None, interact_with_snp=None, force_full_rank=False, force_low_rank=False, G0=None, G1=None, runner=None,
+                 count_A1=None):
     """
     Function performing single SNP GWAS using cross validation over the chromosomes and REML. Will reorder and intersect IIDs as needed.
     (For backwards compatibility, you may use 'leave_out_one_chrom=False' to skip cross validation, but that is not recommended.)
@@ -72,7 +72,7 @@ def single_snp(test_snps, pheno, K0=None,
     :type leave_out_one_chrom: boolean
     
 
-    :param output_file_name: Name of file to write results to, optional. If not given, no output file will be created.
+    :param output_file_name: Name of file to write results to, optional. If not given, no output file will be created. The output format is tab-deleted text.
     :type output_file_name: file name
 
     :param h2: A parameter to LMM learning, optional
@@ -116,6 +116,11 @@ def single_snp(test_snps, pheno, K0=None,
         If not given, the function is run locally.
     :type runner: a runner.
 
+    :param count_A1: If it needs to read SNP data from a BED-formatted file, tells if it should count the number of A1
+         alleles (the PLINK standard) or the number of A2 alleles. False is the current default, but in the future the default will change to True.
+    :type count_A1: bool
+
+
     :rtype: Pandas dataframe with one row per test SNP. Columns include "PValue"
 
 
@@ -139,16 +144,16 @@ def single_snp(test_snps, pheno, K0=None,
         raise Exception("Can't force both full rank and low rank")
 
     assert test_snps is not None, "test_snps must be given as input"
-    test_snps = _snps_fixup(test_snps)
-    pheno = _pheno_fixup(pheno).read()
+    test_snps = _snps_fixup(test_snps, count_A1=count_A1)
+    pheno = _pheno_fixup(pheno, count_A1=count_A1).read()
     assert pheno.sid_count == 1, "Expect pheno to be just one variable"
     pheno = pheno[(pheno.val==pheno.val)[:,0],:]
-    covar = _pheno_fixup(covar, iid_if_none=pheno.iid)
+    covar = _pheno_fixup(covar, iid_if_none=pheno.iid, count_A1=count_A1)
 
     if not leave_out_one_chrom:
         assert covar_by_chrom is None, "When 'leave_out_one_chrom' is False, 'covar_by_chrom' must be None"
-        K0 = _kernel_fixup(K0 or G0 or test_snps, iid_if_none=test_snps.iid, standardizer=Unit())
-        K1 = _kernel_fixup(K1 or G1, iid_if_none=test_snps.iid, standardizer=Unit())
+        K0 = _kernel_fixup(K0 or G0 or test_snps, iid_if_none=test_snps.iid, standardizer=Unit(),count_A1=count_A1)
+        K1 = _kernel_fixup(K1 or G1, iid_if_none=test_snps.iid, standardizer=Unit(),count_A1=count_A1)
         K0, K1, test_snps, pheno, covar  = pstutil.intersect_apply([K0, K1, test_snps, pheno, covar])
         logging.debug("# of iids now {0}".format(K0.iid_count))
         K0, K1, block_size = _set_block_size(K0, K1, mixing, GB_goal, force_full_rank, force_low_rank)
@@ -163,7 +168,7 @@ def single_snp(test_snps, pheno, K0=None,
         assert sid_index_range == (0,test_snps.sid_count), "Some SNP rows are missing from the output"
     else: 
         chrom_list = list(set(test_snps.pos[:,0])) # find the set of all chroms mentioned in test_snps, the main testing data
-        #!!!cmk add error message of chrom_list is just NaN's
+        assert not np.isnan(chrom_list).any(), "chrom list should not contain NaN"
         input_files = [test_snps, pheno, K0, G0, K1, G1, covar] + ([] if covar_by_chrom is None else covar_by_chrom.values())
 
         def nested_closure(chrom):
@@ -579,7 +584,7 @@ def _internal_single(K0, test_snps, pheno, covar, K1,
         return test_snps.sid_count * work_index // work_count
 
     def mapper_closure(work_index):
-        if work_count > 1: logging.info("single_snp: Working on part {0} of {1}".format(work_index,work_count))
+        if work_count > 1: logging.info("single_snp: Working on snp block {0} of {1}".format(work_index,work_count))
         do_work_time = time.time()
         start = debatch_closure(work_index)
         end = debatch_closure(work_index+1)
@@ -596,7 +601,7 @@ def _internal_single(K0, test_snps, pheno, covar, K1,
         chi2stats = beta*beta/res['variance_beta']
         #p_values = stats.chi2.sf(chi2stats,1)[:,0]
         assert test_snps.iid_count == lmm.U.shape[0]
-        #!!!cmk should 3 really be hardcoded here?
+        #should 3 really be hardcoded here?
         p_values = stats.f.sf(chi2stats,1,lmm.U.shape[0]-3)[:,0]#note that G.shape is the number of individuals and 3 is the number of fixed effects (covariates+SNP)
 
         dataframe = _create_dataframe(snps_read.sid_count)
@@ -697,7 +702,7 @@ def _find_mixing_from_Ks(K, covar, K0_val, K1_val, h2, y):
         result = lmm.findH2()
         if (resmin[0] is None) or (result['nLL']<resmin[0]['nLL']):
             resmin[0]=result
-        logging.info("mixing_from_Ks\t{0}\th2\t{1}\tnLL\t{2}".format(mixing,result['h2'],result['nLL'])) #!!!cmk change back to debug
+        logging.debug("mixing_from_Ks\t{0}\th2\t{1}\tnLL\t{2}".format(mixing,result['h2'],result['nLL']))
         #logging.info("reporter:counter:single_snp,find_mixing_from_Ks_count,1")
         assert not np.isnan(result['nLL']), "nLL should be a number (not a NaN)"
         return result['nLL']

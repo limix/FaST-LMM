@@ -316,3 +316,17 @@ tests/tmp_extract_sim.txt
 /tests/datasets/synth/chrNot1.fam
 /fastlmm/fastlmm.VC.VC.opendb
 /fastlmm/fastlmm.VC.db
+/doc/ipynb/.working
+/doc/ipynb/AzureStorage
+/doc/ipynb/cache
+/doc/ipynb/fileshare
+/doc/ipynb/local_cache
+/doc/ipynb/mid_0.1
+/doc/ipynb/setpythonpath.bat
+/doc/ipynb/oldFaSTLMMScale.ipynb
+/doc/ipynb/oldFaSTLMMScale-Copy1.ipynb
+/doc/ipynb/del.azurebed.npz
+/tests/tmp
+/tests/pcs_cov.txt
+/doc/ipynb/FaST-LMM.ipynb.orig
+/fastlmm/util/util.py.orig

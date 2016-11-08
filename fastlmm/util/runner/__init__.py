@@ -84,27 +84,31 @@ def run_one_task(original_distributable, taskindex, taskcount, workdirectory):
         result_sequence = work_sequence_from_disk(workdirectory, taskcount)
         return shaped_distributable.reduce(result_sequence)
 
+
+def work_sequence_for_one_index(distributable, taskAndWorkcount, taskindex):
+    if hasattr(distributable,"work_sequence_range"):
+        is_first_and_only = True
+        for work in distributable.work_sequence_range(taskindex, taskindex+1):
+            assert is_first_and_only, "real assert"
+            is_first_and_only = False
+            yield work
+    else:
+        for workIndex, work in enumerate(distributable.work_sequence()):
+            if workIndex == taskAndWorkcount : raise Exception("Expect len(work_sequence) to match work_count, but work_sequence was too long")
+            if workIndex == taskindex :
+                yield work
+                workDone = True
+                if workIndex != taskAndWorkcount-1  : #the work is done, so quit enumerating work (but don't quit early if you're the last workIndex because we want to double check that the work_sequence and work_count match up)
+                    break
+        if not workDone : raise Exception("Expect len(work_sequence) to match work_count, but work_sequence was too short")
+
 def doMainWorkForOneIndex(distributable, taskAndWorkcount, taskindex, workdirectory):
     task_file_name = create_task_file_name(workdirectory, taskindex, taskAndWorkcount)
     workDone = False
     with open(task_file_name, mode='wb') as f:
-        if hasattr(distributable,"work_sequence_range"):
-            is_first_and_only = True
-            for work in distributable.work_sequence_range(taskindex, taskindex+1):
-                assert is_first_and_only, "real assert"
-                is_first_and_only = False
-                result = run_all_in_memory(work)
-                cPickle.dump(result, f, cPickle.HIGHEST_PROTOCOL) # save a result to the temp results file
-        else:
-            for workIndex, work in enumerate(distributable.work_sequence()):
-                if workIndex == taskAndWorkcount : raise Exception("Expect len(work_sequence) to match work_count, but work_sequence was too long")
-                if workIndex == taskindex :
-                    result = run_all_in_memory(work)
-                    cPickle.dump(result, f, cPickle.HIGHEST_PROTOCOL) # save a result to the temp results file
-                    workDone = True
-                    if workIndex != taskAndWorkcount-1  : #the work is done, so quit enumerating work (but don't quit early if you're the last workIndex because we want to double check that the work_sequence and work_count match up)
-                        break
-            if not workDone : raise Exception("Expect len(work_sequence) to match work_count, but work_sequence was too short")
+        for work in work_sequence_for_one_index(distributable, taskAndWorkcount, taskindex):
+            result = run_all_in_memory(work)
+            cPickle.dump(result, f, cPickle.HIGHEST_PROTOCOL) # save a result to the temp results file
 
 def work_sequence_from_disk(workdirectory, taskAndWorkcount):
     '''
@@ -117,8 +121,8 @@ def work_sequence_from_disk(workdirectory, taskAndWorkcount):
                 result = cPickle.load(f)
             except Exception, detail:
                 raise Exception("Error trying to unpickle '{0}'. {1}".format(task_file_name,detail))
-        if True: #!!!cmk0 taskindex % 100 == 0:
-            logging.info("About to yield result {0} of {1}".format(taskindex,taskAndWorkcount))
+        if True:
+            logging.debug("\tAbout to yield result {0} of {1}".format(taskindex,taskAndWorkcount))
         yield result
 
 
@@ -140,28 +144,28 @@ class BatchUpWork(object): # implements IDistributable
     def work_sequence(self):
         return work_sequence_range(0,self._workcount)
 
-    def work_sequence_range(self, start, end):
-        assert 0 <= start and start <= end and end <= self._workcount, "real assert"
-        for workIndex in xrange(start, end):
+    def work_sequence_range(self, start, stop):
+        assert 0 <= start and start <= stop and stop <= self._workcount, "real assert"
+        for workIndex in xrange(start, stop):
             yield lambda workIndex=workIndex : self.work(workIndex)
             
     def work(self,workIndex):
         result = [workIndex]
-        start, end = self.createSubWorkIndexList(workIndex)
-        for sub_workIndex, sub_work in self.pull_sub_work(start, end):
+        start, stop = self.createSubWorkIndexList(workIndex)
+        for sub_workIndex, sub_work in self.pull_sub_work(start, stop):
             sub_result = run_all_in_memory(sub_work)
             result.append((sub_workIndex,sub_result))
         return result
 
-    def pull_sub_work(self, start, end):
+    def pull_sub_work(self, start, stop):
         if hasattr(self.sub_distributable,"work_sequence_range"):
             index = start
-            for sub_work in self.sub_distributable.work_sequence_range(start,end):
+            for sub_work in self.sub_distributable.work_sequence_range(start,stop):
                 yield index, sub_work
                 index += 1
-            assert index == end, "real assert"
+            assert index == stop, "real assert"
         else:
-            sub_workIndexList = range(end-1,start-1,-1)
+            sub_workIndexList = range(stop-1,start-1,-1)
             for sub_workIndex, sub_work in enumerate(self.sub_distributable.work_sequence()):
                 if sub_workIndex == self.sub_workcount : raise Exception("Expect len(work_sequence) to match work_count")
                 if sub_workIndex ==  sub_workIndexList[-1]:
@@ -179,9 +183,9 @@ class BatchUpWork(object): # implements IDistributable
     def create_sub_result_sequence(self, result_sequence):
         for result in result_sequence:
             workIndex = result.pop(0)
-            start, end = self.createSubWorkIndexList(workIndex)
-            if (end-start) != len(result) : raise Exception("Assert: batched results not expected size")
-            for sub_workIndex, pair in izip(xrange(start,end), result):
+            start, stop = self.createSubWorkIndexList(workIndex)
+            if (stop-start) != len(result) : raise Exception("Assert: batched results not expected size")
+            for sub_workIndex, pair in izip(xrange(start,stop), result):
                 sub_workIndex_check, sub_result = pair
                 if sub_workIndex != sub_workIndex_check : raise Exception("Assert: Unexpected workindex in batched result")
                 yield sub_result
@@ -197,8 +201,8 @@ class BatchUpWork(object): # implements IDistributable
     def createSubWorkIndexList(self, workindex):
         assert 0 <= workindex and workindex < self._workcount, "real assert"
         start = workindex * self.sub_workcount // self._workcount # assuming high prediction integer math
-        end = (workindex + 1) * self.sub_workcount // self._workcount # assuming high prediction integer math
-        return start,end
+        stop = (workindex + 1) * self.sub_workcount // self._workcount # assuming high prediction integer math
+        return start,stop
 
 class ExpandWork(object): # implements IDistributable
     def __init__(self, distributable, workcount, taskcount):
@@ -238,7 +242,7 @@ class ExpandWork(object): # implements IDistributable
             start = self.extra_index + (sub_index - self.excess) * self.floor
         return start
 
-    def sub_sub_start_end(self,sub_start,start,end):
+    def sub_sub_start_stop(self,sub_start,start,stop):
         full_start = self.sub_index_to_start(sub_start)
         full_end = self.sub_index_to_start(sub_start+1)
         if full_start < start:
@@ -246,33 +250,33 @@ class ExpandWork(object): # implements IDistributable
         else:
             sub_sub_start = 0
 
-        if end < full_end:
-            sub_sub_end = end - full_start
+        if stop < full_end:
+            sub_sub_stop = stop - full_start
         else:
-            sub_sub_end = full_end - full_start
+            sub_sub_stop = full_end - full_start
 
-        return sub_sub_start, sub_sub_end
+        return sub_sub_start, sub_sub_stop
                     
 
-    def sub_distributable_work_sequence_range(self,start,end):
+    def sub_distributable_work_sequence_range(self,start,stop):
         if hasattr(self.sub_distributable,"work_sequence_range"):
-            return self.sub_distributable.work_sequence_range(start,end)
+            return self.sub_distributable.work_sequence_range(start,stop)
         else:
-            return islice(self.sub_distributable.work_sequence(),start,end)
+            return islice(self.sub_distributable.work_sequence(),start,stop)
 
 
-    def _work_sequence_range(self,start,end):
+    def _work_sequence_range(self,start,stop):
 
         sub_start = self.index_to_sub_index(start)
-        sub_end = self.index_to_sub_index(end-1)+1
+        sub_stop = self.index_to_sub_index(stop-1)+1
         sub_workIndex=sub_start
         workIndex=start
-        for sub_work in self.sub_distributable_work_sequence_range(sub_start,sub_end):
+        for sub_work in self.sub_distributable_work_sequence_range(sub_start,sub_stop):
             expand_to = self.expand_to(sub_workIndex)
-            sub_sub_start, sub_sub_end = self.sub_sub_start_end(sub_workIndex, start, end)
+            sub_sub_start, sub_sub_stop = self.sub_sub_start_stop(sub_workIndex, start, stop)
             if not callable(sub_work): #i.e. a distributable job. If our expand_to is 3 and i's work_count is 9, then it is batched up 3x3. On the other hand, if its work_count is 2, then we ExpandWork from 2 to 3.
                 shaped_distributable = shape_to_desired_workcount(sub_work, expand_to)
-                for sub_sub_work in shaped_distributable.work_sequence_range(sub_sub_start, sub_sub_end):
+                for sub_sub_work in shaped_distributable.work_sequence_range(sub_sub_start, sub_sub_stop):
                     yield sub_sub_work
                     workIndex += 1
                 #    expand_to -= 1
@@ -285,38 +289,18 @@ class ExpandWork(object): # implements IDistributable
                     yield sub_work
                     workIndex += 1
                     sub_sub_index += 1
-                for sub_sub_index2 in xrange(sub_sub_index, sub_sub_end):
+                for sub_sub_index2 in xrange(sub_sub_index, sub_sub_stop):
                     assert sub_sub_index2 == sub_sub_index, "real assert"
                     yield lambda: None
                     workIndex += 1
                     sub_sub_index += 1
-                assert sub_sub_index == sub_sub_end, "real assert"
+                assert sub_sub_index == sub_sub_stop, "real assert"
             sub_workIndex+=1
-        assert sub_workIndex == sub_end, "real assert"
-        assert workIndex == end, "real assert"
+        assert sub_workIndex == sub_stop, "real assert"
+        assert workIndex == stop, "real assert"
 
     def work_sequence(self):
         return self._work_sequence_range(0,self.work_count)
-        #sub_workIndex=0
-        #workIndex=0
-        #for sub_work in self.sub_distributable.work_sequence():
-        #    expand_to = self.expand_to(sub_workIndex)
-        #    if not callable(sub_work): #i.e. a distributable job. If our expand_to is 3 and i's work_count is 9, then it is batched up 3x3. On the other hand, if its work_count is 2, then we ExpandWork from 2 to 3.
-        #        shaped_distributable = shape_to_desired_workcount(sub_work, expand_to)
-        #        for sub_sub_work in shaped_distributable.work_sequence():
-        #            yield sub_sub_work
-        #            workIndex += 1
-        #            expand_to -= 1
-        #        if expand_to != 0 : raise Exception("Assert: shaped_distributable doesn't have right number of work items")
-        #    else:
-        #        yield sub_work
-        #        workIndex += 1
-        #        for workindex in xrange(1, expand_to):
-        #            yield lambda: None
-        #            workIndex += 1
-        #    sub_workIndex+=1
-        #if sub_workIndex != self.sub_workcount : raise Excpetion("Assert:  expect len(work_sequence) to match workcount")
-        #if workIndex != self._workcount : raise Exception("Assert: expect len(work_sequence) to match workcount")
 
     def reduce(self, result_sequence):
         sub_result_sequence = self.create_sub_result_sequence(result_sequence)
@@ -377,8 +361,8 @@ class MakeWork(object): # implements IDistributable
     def work_count(self):
         return self._workcount
 
-    def work_sequence_range(self,start,end):
-        for i in xrange(start,end):
+    def work_sequence_range(self,start,stop):
+        for i in xrange(start,stop):
             yield lambda: None
 
     def work_sequence(self):
@@ -411,6 +395,7 @@ class SubGen:
 
 from .Local import *
 from .LocalMultiProc import *
+from .LocalMultiThread import *
 from .LocalInParts import *
 from .HPC import *
 from .Hadoop import *
@@ -418,4 +403,3 @@ from .Hadoop2 import *
 from .LocalMapper import *
 from .LocalReducer import *
 from .localfromranges import *
-from .AzureBatch import *

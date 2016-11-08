@@ -16,6 +16,7 @@ import subprocess, sys, os.path
 import multiprocessing
 import fastlmm.util.util as util
 
+
 class LocalMultiProc: # implements IRunner
 
     def __init__(self, taskcount, mkl_num_threads = None, just_one_process = False, logging_handler=logging.StreamHandler(sys.stdout)):
@@ -25,7 +26,7 @@ class LocalMultiProc: # implements IRunner
             logger.setLevel(logging.INFO)
         for h in list(logger.handlers):
             logger.removeHandler(h)
-        if logger.level == logging.NOTSET or logger.level > logging.INFO:
+        if logger.level == logging.NOTSET:
             logger.setLevel(logging.INFO)
         logger.addHandler(logging_handler)
 
@@ -74,3 +75,5 @@ class LocalMultiProc: # implements IRunner
 
         JustCheckExists().output(distributable)
         return result
+
+

@@ -20,7 +20,7 @@ except:
 class HPC: # implements IRunner
     #!!LATER make it (and Hadoop) work from root directories -- or give a clear error message
     def __init__(self, taskcount, clustername, fileshare, priority="Normal", unit="core", mkl_num_threads=None, runtime="infinite", remote_python_parent=None,
-                update_remote_python_parent=False, min=None, max=None, excluded_nodes=[], template=None, nodegroups=None, skipinputcopy=False, node_local=True,clean_up=True,preemptable=True,logging_handler=logging.StreamHandler(sys.stdout)):
+                update_remote_python_parent=False, min=None, max=None, excluded_nodes=[], template=None, nodegroups=None, skipinputcopy=False, node_local=True,clean_up=True,preemptable=True,FailOnTaskFailure=False,logging_handler=logging.StreamHandler(sys.stdout)):
         logger = logging.getLogger()
         if not logger.handlers:
             logger.setLevel(logging.INFO)
@@ -49,6 +49,7 @@ class HPC: # implements IRunner
         self.node_local = node_local
         self.clean_up = clean_up
         self.preemptable = preemptable
+        self.FailOnTaskFailure = FailOnTaskFailure
       
     def run(self, distributable):
         # Check that the local machine has python path set
@@ -150,7 +151,7 @@ class HPC: # implements IRunner
         with open(psfilename_abs, "w") as psfile:
             psfile.write(r"""Add-PsSnapin Microsoft.HPC
         Set-Content Env:CCP_SCHEDULER {0}
-        $r = New-HpcJob -Name "{7}" -Priority {8}{12}{14}{16} -RunTime {15}  #-Preemptable {22}
+        $r = New-HpcJob -Name "{7}" -Priority {8}{12}{14}{16} -RunTime {15} -FailOnTaskFailure {23} #-Preemptable {22}
         $r.Id
         if ({20})
         {10}
@@ -212,8 +213,8 @@ class HPC: # implements IRunner
                                 batfilename_rel[0:-8]+"noderelease.bat", #19
                                 1 if self.node_local else 0,             #20
                                 "",                                      #21 always run release task
-                                ###!!!cmk delete this line#"" if self.clean_up else "#",            #21 if clean_up is false, comment out node release tasks
                                 self.preemptable,                        #22
+                                self.FailOnTaskFailure,
                                 ))
         assert batfilename_rel[-8:] == "dist.bat", "real assert"
         import subprocess
@@ -335,7 +336,7 @@ class HPC: # implements IRunner
         return batfilename_rel
 
     def check_remote_pythoninstall(self):
-        remotepythoninstall = self.fileshare + os.path.sep + "pythonInstallC"
+        remotepythoninstall = self.fileshare + os.path.sep + "pythonInstallC" #!!! don't hardwire this
         if not os.path.isdir(remotepythoninstall): raise Exception("Expect Python and related directories at '{0}'".format(remotepythoninstall))
 
         return remotepythoninstall

@@ -12,7 +12,6 @@ class Dat(object):
     This is a class that reads into memory from DAT/FAM/MAP files.
     '''
 
-    _ran_once = False
 
     def __init__(self,dat_filename):
         '''
@@ -20,6 +19,7 @@ class Dat(object):
         '''
 
         self.dat_filename = dat_filename
+        self._ran_once = False
 
     #!! similar code in fastlmm
     def __repr__(self): 

@@ -541,14 +541,14 @@ def getTestSuite():
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    from fastlmm.util.runner import Local, HPC, LocalMultiProc, AzureBatch, LocalInParts
+    from fastlmm.util.runner import Local, HPC, LocalMultiProc, LocalInParts
 
 
     # this import is needed for the runner
     from fastlmm.association.tests.test_single_snp import TestSingleSnp,TestSingleSnpLeaveOutOneChrom
     suites = unittest.TestSuite([getTestSuite()])
 
-    if False: #Standard test run
+    if True: #Standard test run
         r = unittest.TextTestRunner(failfast=False)
         r.run(suites)
     else: #Cluster test run
@@ -572,7 +572,6 @@ if __name__ == '__main__':
         #runner = LocalMultiProc(taskcount=2,mkl_num_threads=5,just_one_process=False)
         #runner = LocalInParts(0,2,mkl_num_threads=1) # For debugging the cluster runs
         #runner = Hadoop(100, mapmemory=8*1024, reducememory=8*1024, mkl_num_threads=1, queue="default")
-        runner = AzureBatch(task_count=10,min_node_count=2,max_node_count=7,pool_id="a4x1")
         distributable_test = DistributableTest(suites,"temp_test")
         print runner.run(distributable_test)
 

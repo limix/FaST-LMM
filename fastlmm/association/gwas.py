@@ -161,7 +161,7 @@ class GWAS(object):
         chi2stats = beta*beta/res['variance_beta']
 
         #p_values = st.chi2.sf(chi2stats,1)[:,0]
-        #!!!cmk should 3 really be hardcoded here?
+        #should 3 really be hardcoded here?
         p_values = st.f.sf(chi2stats,1,self.lmm.U.shape[0]-3)[:,0]#note that G.shape is the number of individuals and 3 is the number of fixed effects (covariates+SNP)
 
         items = [

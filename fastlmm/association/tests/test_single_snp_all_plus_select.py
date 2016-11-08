@@ -12,24 +12,24 @@ from pysnptools.snpreader import Bed, Pheno,SnpData
 from fastlmm.association import single_snp_all_plus_select,single_snp
 from fastlmm.feature_selection.test import TestFeatureSelection
 
-from fastlmm.util.runner import Local, Hadoop2, HPC, LocalMultiProc, LocalInParts, AzureBatch
+from fastlmm.util.runner import Local, Hadoop2, HPC, LocalMultiProc, LocalInParts
 def mf_to_runner_function(mf):
     excluded_nodes=['GCRCM07B20','GCRCM11B05','GCRCM10B06','GCRCM02B07']#'GCRCM02B11','GCRCM03B07'] #'GCRCM22B06','GCRCN0383','GCRCM02B07','GCRCN0179','GCRCM37B13','GCRCN0376','GCRCN0456']#'gcrcn0231']#"MSR-HDP-DN0316","MSR-HDP-DN0321","MSR-HDP-DN0336","MSR-HDP-DN0377","MSR-HDP-DN0378","MSR-HDP-DN0314","MSR-HDP-DN0335","MSRQC073","MSRQC002","MSRQC015"]
     remote_python_parent=r"\\GCR\Scratch\B99\escience\carlk\data\carlk\pythonpath05272016e"
     clean_up=False
 
     if mf == "debug":
-        runner_function = lambda ignore: LocalInParts(1000,1000,mkl_num_threads=20,result_file="result.p",run_dir=r"\\GCR\Scratch\B99\escience\carlk\data\carlk\cachebio\genetics\uganda\runs\2016-03-03_14_40_27_822760552694")
+        runner_function = lambda ignore: LocalInParts(22,22,mkl_num_threads=20,result_file="result.p",run_dir=r"C:\deldir\test\outputx") 
     elif mf == "local":
         runner_function = lambda ignore: Local()
     elif mf == "local1":
         runner_function = lambda ignore: Local(1)
     elif mf == "lmp":
         runner_function = lambda ignore: LocalMultiProc(22,5)
+    elif mf == "lmp4":
+        runner_function = lambda ignore: LocalMultiProc(4,5)
     elif mf == "lmpl":
         runner_function = lambda taskcount: LocalMultiProc(taskcount,22,just_one_process=True)
-    elif mf == "azure":
-        runner_function = lambda taskcount: AzureBatch(task_count=taskcount,min_node_count=2,max_node_count=taskcount,pool_id="a4x1")
     elif mf == "nodeP":
         runner_function = lambda taskcount: HPC(min(taskcount,30100), 'GCR',r"\\GCR\Scratch\B99\escience",
                                             remote_python_parent=remote_python_parent,

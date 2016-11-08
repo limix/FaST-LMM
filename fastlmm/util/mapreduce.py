@@ -48,11 +48,11 @@ class _MapReduce(object): #implements IDistributable
     def work_count(self):
         return len(self.input_seq)
 
-    def work_sequence_range(self, start, end):
-        for i in xrange(start,end):
+    def work_sequence_range(self, start, stop):
+        for i in xrange(start,stop):
             input_arg = self.input_seq[i]
             if self.nested is None:
-                logging.debug("random access executing %i" % i)
+                logging.debug("\nrandom access executing %i" % i)
                 with _dyn_vars(is_in_nested=False):
                     yield lambda i=i, input_arg=input_arg: self.dowork(i, input_arg)   # the 'i=i',etc is need to get around a strangeness in Python
             else:
@@ -64,7 +64,7 @@ class _MapReduce(object): #implements IDistributable
     def work_sequence(self):
         for i, input_arg in enumerate(self.input_seq):
             if self.nested is None:
-                logging.debug("executing %i" % i)
+                logging.debug("\nexecuting %i" % i)
                 with _dyn_vars(is_in_nested=False):
                     yield lambda i=i, input_arg=input_arg: self.dowork(i, input_arg)  # the 'i=i',etc is need to get around a strangeness in Python
             else:
@@ -91,7 +91,7 @@ class _MapReduce(object): #implements IDistributable
 
     def dowork(self, i, input_arg):
         #logging.info("{0}, {1}".format(len(train_snp_idx), len(test_snp_idx)))
-        logging.debug("executing {0}".format(input_arg))
+        logging.debug("\nexecuting {0}".format(input_arg))
         work = lambda : self.mapper(input_arg)
         result = run_all_in_memory(work)
         return result

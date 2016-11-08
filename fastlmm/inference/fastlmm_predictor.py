@@ -62,6 +62,7 @@ class _SnpWholeTest(KernelReader):
         if row_index_or_none is None:
             row_index_or_none = range(self.row_count)
 
+        assert not isinstance(row_index_or_none,str), "row_index_or_none should not be a string"
         iid = self.row[row_index_or_none]
 
         if col_index_or_none is None or np.array_equal(col_index_or_none,range(self.col_count)):
@@ -179,9 +180,9 @@ class _SnpTrainTest(KernelReader):
         copier.input(self.train)
         copier.input(self.test)
         copier.input(self.standardizer)
-def _snps_fixup(snp_input, iid_if_none=None):
+def _snps_fixup(snp_input, iid_if_none=None,count_A1=None):
     if isinstance(snp_input, str):
-        return Bed(snp_input)
+        return Bed(snp_input,count_A1=count_A1)
 
     if isinstance(snp_input, dict):
         return SnpData(iid=snp_input['iid'],sid=snp_input['header'],val=snp_input['vals'])
@@ -192,16 +193,16 @@ def _snps_fixup(snp_input, iid_if_none=None):
 
     return snp_input
 
-def _pheno_fixup(pheno_input, iid_if_none=None, missing ='NaN'):
+def _pheno_fixup(pheno_input, iid_if_none=None, missing ='NaN',count_A1=None):
 
     try:
         ret = Pheno(pheno_input, iid_if_none, missing=missing)
         ret.iid #doing this just to force file load
         return ret
     except:
-        return _snps_fixup(pheno_input, iid_if_none=iid_if_none)
+        return _snps_fixup(pheno_input, iid_if_none=iid_if_none,count_A1=count_A1)
 
-def _kernel_fixup(input, iid_if_none, standardizer, test=None, test_iid_if_none=None, block_size=None, train_snps=None):
+def _kernel_fixup(input, iid_if_none, standardizer, test=None, test_iid_if_none=None, block_size=None, train_snps=None, count_A1=None):
     if test is not None and input is None:
         input = test
         test = None
@@ -210,9 +211,9 @@ def _kernel_fixup(input, iid_if_none, standardizer, test=None, test_iid_if_none=
         return KernelNpz(input)
 
     if isinstance(input, str):
-        input = Bed(input)     #Note that we don't return here. Processing continues
+        input = Bed(input, count_A1=count_A1)     #Note that we don't return here. Processing continues
     if isinstance(test, str):
-        test = Bed(test)      #Note that we don't return here. Processing continues
+        test = Bed(test, count_A1=count_A1)      #Note that we don't return here. Processing continues
 
     if isinstance(input,SnpReader):
         if test is not None:
@@ -273,8 +274,8 @@ class FastLMM(object):
         self.kernel_standardizer = kernel_standardizer
         self.is_fitted = False
 
-
-    def fit(self, X=None, y=None, K0_train=None, K1_train=None, h2raw=None, mixing=None):#!!!cmk is this h2 or h2corr????
+    #!!!update doc to explain h2raw w.r.t h2
+    def fit(self, X=None, y=None, K0_train=None, K1_train=None, h2raw=None, mixing=None):#!!!is this h2 or h2corr????
         """
         Method for training a :class:`FastLMM` predictor. If the examples in X, y, K0_train, K1_train are not the same, they will be reordered and intersected.
 
@@ -296,7 +297,7 @@ class FastLMM(object):
                Can be PySnpTools :class:`.KernelReader`. If you give a string it can be the name of a :class:`.KernelNpz` file.
         :type K1_train: :class:`.SnpReader` or a string or :class:`.KernelReader`
 
-        :param h2raw: A parameter to LMM learning that tells how much weight to give the K's vs. the identity matrix, optional #!!!cmk update doc to explain h2raw w.r.t h2
+        :param h2raw: A parameter to LMM learning that tells how much weight to give the K's vs. the identity matrix, optional 
                 If not given will search for best value.
                 If mixing is unspecified, then h2 must also be unspecified.
         :type h2raw: number
@@ -454,7 +455,7 @@ class FastLMM(object):
                     result.val[iid_index,0] = nll
                 return result
             else:
-               raise Exception("!!!cmk need code for mse_too")                                  
+               raise Exception("need code for mse_too")                                  
 
 
     def _extract_fixup(kernel):
@@ -556,4 +557,3 @@ if __name__ == "__main__":
 
     import doctest
     doctest.testmod()
-

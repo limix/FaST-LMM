@@ -13,7 +13,7 @@ class LocalReducer: # implements IRunner
             logger.setLevel(logging.INFO)
         for h in list(logger.handlers):
             logger.removeHandler(h)
-        if logger.level == logging.NOTSET or logger.level > logging.INFO:
+        if logger.level == logging.NOTSET:
             logger.setLevel(logging.INFO)
         logger.addHandler(logging_handler)
 

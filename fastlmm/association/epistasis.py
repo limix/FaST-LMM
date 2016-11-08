@@ -52,7 +52,7 @@ def epistasis(test_snps,pheno,G0, G1=None, mixing=0.0, covar=None,output_file_na
             If you give no sid_list_1, all sids in test_snps will be used.
     :type sid_list_1: list of strings
 
-    :param output_file_name: Name of file to write results to, optional. If not given, no output file will be created.
+    :param output_file_name: Name of file to write results to, optional. If not given, no output file will be created. The output format is tab-deleted text.
     :type output_file_name: file name
 
     :param log_delta: A parameter to LMM learning, optional
@@ -87,7 +87,7 @@ def epistasis(test_snps,pheno,G0, G1=None, mixing=0.0, covar=None,output_file_na
     >>> from pysnptools.snpreader import Bed
     >>> from fastlmm.association import epistasis
     >>> logging.basicConfig(level=logging.INFO)
-    >>> test_snps = Bed('../../tests/datasets/all_chr.maf0.001.N300')
+    >>> test_snps = Bed('../../tests/datasets/all_chr.maf0.001.N300',count_A1=True)
     >>> pheno = '../../tests/datasets/phenSynthFrom22.23.N300.randcidorder.txt'
     >>> covar = '../../tests/datasets/all_chr.maf0.001.covariates.N300.txt'
     >>> results_dataframe = epistasis(test_snps, pheno, G0=test_snps, covar=covar, 
@@ -122,6 +122,8 @@ class _Epistasis(object) : #implements IDistributable
 
     def __init__(self,test_snps,pheno,G0, G1=None, mixing=0.0, covar=None,sid_list_0=None,sid_list_1=None,
                  log_delta=None, min_log_delta=-5, max_log_delta=10, output_file=None, cache_file=None):
+        self._ran_once = False
+
         self.test_snps = test_snps
         self.pheno = pheno
         self.output_file_or_none = output_file
@@ -135,7 +137,6 @@ class _Epistasis(object) : #implements IDistributable
         self.external_log_delta=log_delta
         self.min_log_delta = min_log_delta
         self.max_log_delta = max_log_delta
-        self._ran_once = False
         self._str = "{0}({1},{2},G0={6},G1={7},mixing={8},covar={3},output_file={12},sid_list_0={4},sid_list_1{5},log_delta={9},min_log_delta={10},max_log_delta={11},cache_file={13})".format(
             self.__class__.__name__, self.test_snps,self.pheno,self.covar,self.sid_list_0,self.sid_list_1,
                  self.G0, self.G1_or_none, self.mixing, self.external_log_delta, self.min_log_delta, self.max_log_delta, output_file, cache_file)
@@ -161,10 +162,10 @@ class _Epistasis(object) : #implements IDistributable
             self.G0 = Bed(self.G0)
 
         if isinstance(self.pheno, str):
-            self.pheno = pstpheno.loadOnePhen(self.pheno,vectorize=True) #!! what about missing=-9?
+            self.pheno = pstpheno.loadOnePhen(self.pheno,vectorize=True,missing='NaN')
 
         if self.covar is not None and isinstance(self.covar, str):
-            self.covar = pstpheno.loadPhen(self.covar)#!! what about missing=-9?
+            self.covar = pstpheno.loadPhen(self.covar,missing='NaN')
 
         if self.G1_or_none is not None and isinstance(self.G1_or_none, str):
             self.G1_or_none = Bed(self.G1_or_none)
@@ -220,7 +221,7 @@ class _Epistasis(object) : #implements IDistributable
         #doesn't need "run_once()"
 
         frame = pd.concat(result_sequence)
-        frame.sort("PValue", inplace=True)
+        frame.sort_values(by="PValue", inplace=True)
         frame.index = np.arange(len(frame))
 
         if self.output_file_or_none is not None:
