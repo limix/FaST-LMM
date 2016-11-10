@@ -6,7 +6,7 @@ FaST-LMM, which stands for Factored Spectrally Transformed Linear Mixed Models, 
 Our documentation (including live examples) is also available as ipython notebooks:
 
 * Main Functions: https://github.com/MicrosoftGenomics/FaST-LMM/blob/master/doc/ipynb/FaST-LMM.ipynb
-* Heritability with Spatial Correction: https://github.com/MicrosoftGenomics/FaST-LMM/blob/master/doc/ipynb/heritability_si.ipynb
+* Heritability with Spatial Correction (described in Heckerman _et al._, _PNAS_ 2016): https://github.com/MicrosoftGenomics/FaST-LMM/blob/master/doc/ipynb/heritability_si.ipynb
 
 Additionally, API documentation is available:
 http://microsoftgenomics.github.io/FaST-LMM/
