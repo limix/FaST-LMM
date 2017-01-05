@@ -214,7 +214,7 @@ class HPC: # implements IRunner
                                 1 if self.node_local else 0,             #20
                                 "",                                      #21 always run release task
                                 self.preemptable,                        #22
-                                self.FailOnTaskFailure,
+                                '$true' if self.FailOnTaskFailure else '$false',   #23
                                 ))
         assert batfilename_rel[-8:] == "dist.bat", "real assert"
         import subprocess
@@ -336,7 +336,7 @@ class HPC: # implements IRunner
         return batfilename_rel
 
     def check_remote_pythoninstall(self):
-        remotepythoninstall = self.fileshare + os.path.sep + "pythonInstallC" #!!! don't hardwire this
+        remotepythoninstall = r"\\GCR\Scratch\RR1\jennl\pythonInstallJenn"  #!!! don't hardwire this
         if not os.path.isdir(remotepythoninstall): raise Exception("Expect Python and related directories at '{0}'".format(remotepythoninstall))
 
         return remotepythoninstall

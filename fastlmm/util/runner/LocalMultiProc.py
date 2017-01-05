@@ -57,7 +57,7 @@ class LocalMultiProc: # implements IRunner
             proc_list = []
             for taskindex in xrange(self.taskcount):
                 command_string = command_format_string.format(taskindex)
-                proc = subprocess.Popen(command_string.split(" "), cwd=os.getcwd())
+                proc = subprocess.Popen(command_string.split(" "), cwd=os.getcwd())#!!!bug: If Anaconda is installed in c:\program files\anaconda2 this will fail
                 proc_list.append(proc)
 
             for taskindex, proc in enumerate(proc_list):            

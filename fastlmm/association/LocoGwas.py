@@ -408,7 +408,7 @@ class FastGwas(object):
         chi2stats = res['beta']*res['beta']/res['variance_beta']
         
         self.p_values = stats.chi2.sf(chi2stats,1)[:,0]
-        self.p_values_F = stats.f.sf(chi2stats,1,G.shape[0]-lmm.linreg.D)[:,0]#note that G.shape is the number of individuals and 3 is the number of fixed effects (covariates+SNP)
+        self.p_values_F = stats.f.sf(chi2stats,1,G.shape[0]-(lmm.linreg.D+1))[:,0]#note that G.shape is the number of individuals
         self.p_idx = np.argsort(self.p_values)        
         self.sorted_p_values = self.p_values[self.p_idx]
 

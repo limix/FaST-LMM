@@ -330,3 +330,6 @@ tests/tmp_extract_sim.txt
 /tests/pcs_cov.txt
 /doc/ipynb/FaST-LMM.ipynb.orig
 /fastlmm/util/util.py.orig
+/tests/del1.txt
+/tests/datasets/script2.py
+/tests/datasets/script1.py

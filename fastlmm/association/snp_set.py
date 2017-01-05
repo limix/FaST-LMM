@@ -9,6 +9,7 @@ from fastlmm.util.pickle_io import load, save
 import time
 import pandas as pd
 
+#!!! add option to show p-value 50/50 and have it default false
 def snp_set(
         test_snps,
         set_list,
