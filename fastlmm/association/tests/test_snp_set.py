@@ -159,8 +159,8 @@ if __name__ == '__main__':
     from fastlmm.association.tests.test_snp_set import TestSnpSet
     suites = unittest.TestSuite([getTestSuite()])
 
-    if True: #Standard test run
-        r = unittest.TextTestRunner(failfast=False)
+    if False: #Standard test run
+        r = unittest.TextTestRunner(failfast=True) #!!!cmk set to False
         r.run(suites)
     else: #Cluster test run
         from fastlmm.util.distributabletest import DistributableTest

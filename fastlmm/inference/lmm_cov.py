@@ -1074,8 +1074,7 @@ if __name__ == "__main__":
         chi2stats = res['beta'] * res['beta'] / res['variance_beta']
         
         pv = st.chi2.sf(chi2stats,1)
-        pv_ = st.f.sf(chi2stats,1,G.shape[0] - (lmm.linreg.D+1))#note that G.shape is the number of individuals and 3 is the number of fixed
-                                                 #effects (covariates+Snp)
+        pv_ = st.f.sf(chi2stats,1,G.shape[0] - (lmm.linreg.D+1))#note that G.shape is the number of individuals
         
         chi2stats2 = res2['beta'] * res2['beta'] / res2['variance_beta']
         

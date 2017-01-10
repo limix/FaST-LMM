@@ -336,7 +336,7 @@ class HPC: # implements IRunner
         return batfilename_rel
 
     def check_remote_pythoninstall(self):
-        remotepythoninstall = r"\\GCR\Scratch\RR1\jennl\pythonInstallJenn"  #!!! don't hardwire this
+        remotepythoninstall = r"\\GCR\Scratch\RR1\escience\pythonInstallD"  #!!! don't hardwire this
         if not os.path.isdir(remotepythoninstall): raise Exception("Expect Python and related directories at '{0}'".format(remotepythoninstall))
 
         return remotepythoninstall

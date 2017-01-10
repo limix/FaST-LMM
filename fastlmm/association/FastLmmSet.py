@@ -111,7 +111,7 @@ class FastLmmSet: # implements IDistributable
         self._synthphenfile=None
 
         self.alt_snpreader = None
-
+        self.show_pvalue_5050 = False
 
         
         if hasattr(self,"ipheno"):
@@ -359,6 +359,15 @@ class FastLmmSet: # implements IDistributable
                 self.test.write(fp, ind, result_dict, pv_adj, self.detailed_table, self.signal_ratio)
             else:
                 self.test.write(fp, ind, result_dict, pv_adj, self.detailed_table)
+
+        if not self.show_pvalue_5050: #Remove the unwanted column if requested and necessary
+            dataframe=pd.read_csv(outfiletab,delimiter='\t',comment=None) #Need \t instead of \s because the output has tabs by design and spaces in column names(?)
+            # adjust the dataframe and then remove the original outfile and (if requested) create a final outfile
+            header5050 = 'P-value(50/50)'
+            if header5050 in dataframe.columns:
+                dataframe.drop(header5050, axis=1, inplace=True)
+            dataframe.rename(columns={'P-value_adjusted': 'P-value'}, inplace=True)
+            dataframe.to_csv(outfiletab, sep="\t", index=False)
 
         logger.removeHandler(logging_handler)
         logging_handler.close()

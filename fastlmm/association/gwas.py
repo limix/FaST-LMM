@@ -25,7 +25,7 @@ import pandas as pd
 from fastlmm.util.mingrid import *
 from fastlmm.util import *
 import time, os
-import ipdb
+#import ipdb
 from pysnptools.snpreader import Bed
 
 import logging
@@ -161,8 +161,7 @@ class GWAS(object):
         chi2stats = beta*beta/res['variance_beta']
 
         #p_values = st.chi2.sf(chi2stats,1)[:,0]
-        #should 3 really be hardcoded here?
-        p_values = st.f.sf(chi2stats,1,self.lmm.U.shape[0]-3)[:,0]#note that G.shape is the number of individuals and 3 is the number of fixed effects (covariates+SNP)
+        p_values = st.f.sf(chi2stats,1,self.lmm.U.shape[0]-(self.covariates.shape[0]+1))[:,0]#note that G.shape is the number of individuals
 
         items = [
             ('SNP', snps.sid),

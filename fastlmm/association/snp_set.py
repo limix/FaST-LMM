@@ -9,7 +9,6 @@ from fastlmm.util.pickle_io import load, save
 import time
 import pandas as pd
 
-#!!! add option to show p-value 50/50 and have it default false
 def snp_set(
         test_snps,
         set_list,
@@ -28,7 +27,8 @@ def snp_set(
         minsetsize = None,
         maxsetsize = None,
         mindist=0,
-        idist=1
+        idist=1,
+        show_pvalue_5050 = False
     ):
     """
     Function performing GWAS on sets of snps
@@ -90,6 +90,11 @@ def snp_set(
          2, base-pair distance
     :type idist: number
 
+    :param show_pvalue_5050: (default: False) show a conservative P-value arising from an assumed null distribution that is a 50-50 mixture distribution of 0 and 1 dof chi squares [Molenberghs and Verbeke, 2003].
+     Provided for backwards compatibility.
+
+    :type show_pvalue_5050: Boolean
+
 
     :rtype: Pandas dataframe with one row per set.
 
@@ -102,7 +107,7 @@ def snp_set(
     ...     test_snps = '../../tests/datasets/all_chr.maf0.001.N300',
     ...     set_list = '../../tests/datasets/set_input.23.txt',
     ...     pheno = '../../tests/datasets/phenSynthFrom22.23.N300.txt')
-    >>> print result_dataframe.iloc[0].SetId, round(result_dataframe.iloc[0]['P-value_adjusted'],15)
+    >>> print result_dataframe.iloc[0].SetId, round(result_dataframe.iloc[0]['P-value'],15)
     set23 0.0
 
     """
@@ -150,12 +155,12 @@ def snp_set(
         calseed = seed,
         minsetsize = minsetsize,
         maxsetsize = maxsetsize,
-        write_lrtperm = write_lrtperm
+        write_lrtperm = write_lrtperm,
+        show_pvalue_5050 = show_pvalue_5050,
         )
     result = Local().run(fast_lmm_set)
 
     dataframe=pd.read_csv(output_file_name,delimiter='\t',comment=None) #Need \t instead of \s because the output has tabs by design and spaces in column names(?)
-
     if is_temp:
         fptr.close()
         os.remove(output_file_name)
@@ -166,37 +171,15 @@ def snp_set(
 if __name__ == "__main__":
 
 
-    #os.chdir("../..")
-
-    #from pysnptools.snpreader import Bed
-    #all_snps = Bed("tests/datasets/synth/all")
-    #chr1_snps = all_snps[:,all_snps.pos[:,0] == 1]
-    #with open(r"c:\deldir\chr1.sets.txt","w") as f:
-    #    f.write("snp\tset\n")
-    #    for i, sid in enumerate(chr1_snps.sid):
-    #        gene = "set_{0}".format(i // 10)
-    #        f.write("{0}\t{1}\n".format(sid,gene))
-
-    #logging.basicConfig(level=logging.WARNING)
+    #import logging
     #from fastlmm.association import snp_set
-
+    #logging.basicConfig(level=logging.INFO)
     #result_dataframe = snp_set(
-    #    test_snps = "../../tests/datasets/synth/chr1",
-    #    set_list = "../../tests/datasets/synth/chr1.sets.txt",
-    #    pheno = "../../tests/datasets/synth/pheno_10_causals.txt",
-    #    G0 = '../../tests/datasets/all_chr.maf0.001.chr22.23.N300.bed',
-    #    test="lrt_up"
-    #    )
-
-    #print result_dataframe.iloc[0].SetId, round(result_dataframe.iloc[0]['P-value_adjusted'],70)
-    #else:
-    #    result_dataframe = snp_set(
-    #        test_snps = '../../tests/datasets/all_chr.maf0.001.N300',
-    #        set_list = '../../tests/datasets/set_input.23.txt',
-    #        pheno = '../../tests/datasets/phenSynthFrom22.23.N300.txt',
-    #        G0 = '../../tests/datasets/all_chr.maf0.001.chr22.23.N300.bed'
-    #        )
-    #    print result_dataframe.iloc[0].SetId, round(result_dataframe.iloc[0]['P-value_adjusted'],70)
+    #     test_snps = '../../tests/datasets/all_chr.maf0.001.N300',
+    #     set_list = '../../tests/datasets/set_input.23.txt',
+    #     pheno = '../../tests/datasets/phenSynthFrom22.23.N300.txt')
+    #print result_dataframe.iloc[0].SetId, round(result_dataframe.iloc[0]['P-value_lrt'],15)
+    ##set23 0.0
 
 
     import doctest

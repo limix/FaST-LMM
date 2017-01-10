@@ -601,7 +601,7 @@ def _internal_single(K0, test_snps, pheno, covar, K1,
         chi2stats = beta*beta/res['variance_beta']
         #p_values = stats.chi2.sf(chi2stats,1)[:,0]
         assert test_snps.iid_count == lmm.U.shape[0]
-        p_values = stats.f.sf(chi2stats,1,lmm.U.shape[0]-(lmm.linreg.D-1))[:,0]#note that G.shape is the number of individuals
+        p_values = stats.f.sf(chi2stats,1,lmm.U.shape[0]-(lmm.linreg.D+1))[:,0]#note that G.shape is the number of individuals#
 
         dataframe = _create_dataframe(snps_read.sid_count)
         dataframe['sid_index'] = np.arange(start,end)
@@ -726,7 +726,6 @@ def _mix_from_Ks(K, K0_val, K1_val, mixing):
     K[:,:] = K0_val * (1.0-mixing) + K1_val * mixing
 
 if __name__ == "__main__":
-
     logging.basicConfig(level=logging.INFO)
 
     import doctest
