@@ -26,7 +26,7 @@ from fastlmm.util.mingrid import *
 from fastlmm.util import *
 import time, os
 #import ipdb
-from pysnptools.snpreader import Bed
+from pysnptools.snpreader import Bed, PGen
 
 import logging
 import pysnptools.standardizer
@@ -161,7 +161,9 @@ class GWAS(object):
         chi2stats = beta*beta/res['variance_beta']
 
         #p_values = st.chi2.sf(chi2stats,1)[:,0]
-        p_values = st.f.sf(chi2stats,1,self.lmm.U.shape[0]-(self.covariates.shape[0]+1))[:,0]#note that G.shape is the number of individuals
+        #p_values = st.f.sf(chi2stats,1,self.lmm.U.shape[0]-(self.covariates.shape[0]+1))[:,0]#note that G.shape is the number of individuals
+        # the line above looks buggy, should be covariates.shape[1] (numberof covariates, not number of people)
+        p_values = st.f.sf(chi2stats,1,self.lmm.U.shape[0]-(self.covariates.shape[1]+1))[:,0]#note that G.shape is the number of individuals
 
         items = [
             ('SNP', snps.sid),
@@ -199,7 +201,7 @@ class GWAS(object):
     @staticmethod
     def _snp_fixup(snp_input, iid_source_if_none=None):
         if isinstance(snp_input, str):
-            return Bed(snp_input)
+            return PGen(snp_input)
         elif snp_input is None:
             return iid_source_if_none[:,0:0] #return snpreader with no snps
         else:
@@ -245,18 +247,21 @@ class GWAS(object):
 if __name__ == "__main__":
 
     bed_fn = "../../test/data/plinkdata/toydata"
+    bed_fn = '/Users/clippert/Source/cerebro/CodeBase/Src/Pgenlib/example_data/qc-export-20160229-NODEV-VarMaj_Hg38_Mm'
     pheno_fn = bed_fn + ".phe6"#"../../test/data/plinkdata/toydata.phe"
-    covariate_fn = bed_fn + ".phe"
+    pheno_fn = bed_fn + ".phen"
+    covariate_fn = bed_fn + ".covar"
 
     
     blocksize = 20000
-    snp_reader = Bed(bed_fn)#[:,0:50000]
+    #snp_reader = Bed(bed_fn)#[:,0:50000]
+    snp_reader = PGen(bed_fn)[:,50000:100000]
     #snp_reader.run_once()
     if 1:
         standardizer = pysnptools.standardizer.Unit()
     else:
         standardizer = pysnptools.standardizer.Beta(1,2)
-    pheno = pysnptools.util.pheno.loadPhen(filename=pheno_fn,   missing ='-9')
+    pheno = pysnptools.util.pheno.loadPhen(filename=pheno_fn, missing ='-9')
     pheno = GWAS._pheno_fixup(pheno)
     covariates = GWAS._pheno_fixup(covariate_fn, iid_source_if_none=pheno)
     print "intersecting data"
