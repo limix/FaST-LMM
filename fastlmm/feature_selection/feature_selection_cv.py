@@ -410,7 +410,7 @@ class FeatureSelectionStrategy(object):
                 cols = pd.MultiIndex.from_arrays([split_idx, k_values*(self.num_folds+1)], names=['split_id','k_value'])
                 df = pd.DataFrame(stacked_result, columns=delta_values, index=cols)
                 util.create_directory_if_necessary(out_fn)
-                df.to_csv(out_fn, column_label="delta")
+                df.to_csv(out_fn)
             
             # make sure delta is not at the boundary for any k
             assert average_loss.shape[0] == len(k_values)
@@ -512,7 +512,7 @@ class FeatureSelectionStrategy(object):
                 print "Christoph: bug, this is a quick fix that runs but may write out wrong results"
                 df = pd.DataFrame(stacked_result.flatten()[:, None], columns=[label], index=cols)
                 util.create_directory_if_necessary(out_fn)
-                df.to_csv(out_fn, column_label="delta")
+                df.to_csv(out_fn)
             if create_pdf and (output_prefix != None):
                 # visualize results
                 import matplotlib
