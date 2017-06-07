@@ -37,7 +37,7 @@ class CleanCommand(Clean):
                     or filename.endswith('.pyc')
                                 ):
                     tmp_fn = os.path.join(dirpath, filename)
-                    print "removing", tmp_fn
+                    print("removing", tmp_fn)
                     os.unlink(tmp_fn)
 
 # set up macro
